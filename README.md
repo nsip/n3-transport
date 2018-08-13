@@ -61,6 +61,15 @@ This component is built into the nsip tendermint instance, but can be used separ
     context := "SIF"
     version := 1 // arbitrary for now
 
+    tuple := &pb.SPOTuple{
+      Subject:   subject,
+      Predicate: predicate,
+      Object:    object,
+      Version:   version,
+      Context:   context,
+    }
+
+
     err := n3ic.StoreTuple(tuple)
     if err != nil {
       log.println("storage error: ",err)
