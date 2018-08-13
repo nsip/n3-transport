@@ -67,7 +67,10 @@ This component is built into the nsip tendermint instance, but can be used separ
     }
 
 
+In the /app area you will find a test-harness example tmpub/pub.go which can be customised to test publish using either service.
 
-    
+The /scripts area contains some useful shell scripts and configs for running tendermint and influx.
+
+
     
 
