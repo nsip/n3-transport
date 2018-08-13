@@ -1,5 +1,9 @@
 # n3-transport
-Pluggable transport layer for n3 allowing for streams or blockchain
+Pluggable transport layer for n3 allowing for stream or blockchain publishing.
+Blockchain publisher tagets Tendermint.
+Streams will target nats.
+
+A storage publisher for influx is also included.
 
 
 ## Tendermint publisher
