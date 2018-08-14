@@ -32,6 +32,10 @@ func NewPublisher() (*Publisher, error) {
 	return n3ic, nil
 }
 
+func (n3ic *Publisher) Query(q influx.Query) (*influx.Response, error) {
+	return n3ic.cl.Query(q)
+}
+
 func influxClient() (influx.Client, error) {
 
 	c, err := influx.NewHTTPClient(influx.HTTPConfig{
@@ -141,7 +145,7 @@ func (n3ic *Publisher) DeleteTuple(tuple *pb.SPOTuple) error {
 		// "object":    tuple.Object,
 	}
 
-	q := influx.NewQuery(fmt.Sprintf("SELECT object, version FROM %s WHERE subject = %s AND predicate = %s ORDER BY time DESC LIMIT 1", tuple.Context, tuple.Subject, tuple.Predicate), "tuples", "")
+	q := influx.NewQuery(fmt.Sprintf("SELECT object, version FROM %s WHERE subject = '%s' AND predicate = '%s' ORDER BY time DESC LIMIT 1", tuple.Context, tuple.Subject, tuple.Predicate), "tuples", "")
 	if response, err := n3ic.cl.Query(q); err == nil && response.Error() == nil {
 		if len(response.Results) > 0 && len(response.Results[0].Series) > 0 {
 			if o, ok := response.Results[0].Series[0].Tags["object"]; ok {
