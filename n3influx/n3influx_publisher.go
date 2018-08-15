@@ -105,6 +105,10 @@ func (n3ic *Publisher) startStorageHandler() {
 // send the tuple to influx, passes into batching storage handler
 //
 func (n3ic *Publisher) StoreTuple(tuple *pb.SPOTuple) error {
+	// don't publish empty objects (deletion markers): we have tombstoning for that
+	if len(tuple.Object) == 0 {
+		return nil
+	}
 
 	// extract data from tuple and use to construct point
 	tags := map[string]string{
@@ -148,7 +152,11 @@ func (n3ic *Publisher) DeleteTuple(tuple *pb.SPOTuple) error {
 	q := influx.NewQuery(fmt.Sprintf("SELECT object, version FROM %s WHERE subject = '%s' AND predicate = '%s' ORDER BY time DESC LIMIT 1", tuple.Context, tuple.Subject, tuple.Predicate), "tuples", "")
 	if response, err := n3ic.cl.Query(q); err == nil && response.Error() == nil {
 		if len(response.Results) > 0 && len(response.Results[0].Series) > 0 && len(response.Results[0].Series[0].Values) > 0 {
-			tags["object"] = interface{}(response.Results[0].Series[0].Values[0][1]).(string)
+			if response.Results[0].Series[0].Values[0][1] != nil {
+				tags["object"] = interface{}(response.Results[0].Series[0].Values[0][1]).(string)
+			} else {
+				tags["object"] = ""
+			}
 		}
 	}
 	pt, err := influx.NewPoint(tuple.Context, tags, fields, time.Now())
