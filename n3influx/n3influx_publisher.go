@@ -147,10 +147,8 @@ func (n3ic *Publisher) DeleteTuple(tuple *pb.SPOTuple) error {
 
 	q := influx.NewQuery(fmt.Sprintf("SELECT object, version FROM %s WHERE subject = '%s' AND predicate = '%s' ORDER BY time DESC LIMIT 1", tuple.Context, tuple.Subject, tuple.Predicate), "tuples", "")
 	if response, err := n3ic.cl.Query(q); err == nil && response.Error() == nil {
-		if len(response.Results) > 0 && len(response.Results[0].Series) > 0 {
-			if o, ok := response.Results[0].Series[0].Tags["object"]; ok {
-				tags["object"] = o
-			}
+		if len(response.Results) > 0 && len(response.Results[0].Series) > 0 && len(response.Results[0].Series[0].Values) > 0 {
+			tags["object"] = interface{}(response.Results[0].Series[0].Values[0][0]).(string)
 		}
 	}
 	pt, err := influx.NewPoint(tuple.Context, tags, fields, time.Now())
