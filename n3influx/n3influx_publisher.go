@@ -3,6 +3,7 @@
 package n3influx
 
 import (
+	"fmt"
 	"log"
 	"time"
 
@@ -29,6 +30,10 @@ func NewPublisher() (*Publisher, error) {
 	log.Println("starting storeage handler...")
 	go n3ic.startStorageHandler()
 	return n3ic, nil
+}
+
+func (n3ic *Publisher) Query(q influx.Query) (*influx.Response, error) {
+	return n3ic.cl.Query(q)
 }
 
 func influxClient() (influx.Client, error) {
@@ -58,6 +63,12 @@ func (n3ic *Publisher) startStorageHandler() {
 	batchInterval := time.Duration(time.Millisecond * 500)
 	batchSize := 500
 	tick := time.NewTicker(batchInterval)
+
+	// if database already exists, this is ignored
+	q := influx.NewQuery("CREATE DATABASE tuples", "", "")
+	if response, err := n3ic.cl.Query(q); err == nil && response.Error() == nil {
+		fmt.Println(response.Results)
+	}
 
 	for {
 		timeout := false
@@ -94,12 +105,17 @@ func (n3ic *Publisher) startStorageHandler() {
 // send the tuple to influx, passes into batching storage handler
 //
 func (n3ic *Publisher) StoreTuple(tuple *pb.SPOTuple) error {
+	// don't publish empty objects (deletion markers): we have tombstoning for that
+	if len(tuple.Object) == 0 {
+		return nil
+	}
 
 	// extract data from tuple and use to construct point
 	tags := map[string]string{
 		"subject":   tuple.Subject,
 		"predicate": tuple.Predicate,
 		"object":    tuple.Object,
+		"tombstone": "false",
 	}
 	fields := map[string]interface{}{
 		"version": tuple.Version,
@@ -107,6 +123,42 @@ func (n3ic *Publisher) StoreTuple(tuple *pb.SPOTuple) error {
 		// "object":    tuple.Object,
 	}
 
+	pt, err := influx.NewPoint(tuple.Context, tags, fields, time.Now())
+	if err != nil {
+		return err
+	}
+
+	n3ic.ch <- pt
+
+	return nil
+}
+
+// "delete" the tuple: tuple is stored but tombstoned
+func (n3ic *Publisher) DeleteTuple(tuple *pb.SPOTuple) error {
+
+	// extract data from tuple and use to construct point
+	tags := map[string]string{
+		"subject":   tuple.Subject,
+		"predicate": tuple.Predicate,
+		"object":    tuple.Object,
+		"tombstone": "true",
+	}
+	fields := map[string]interface{}{
+		"version": tuple.Version,
+		// "predicate": tuple.Predicate,
+		// "object":    tuple.Object,
+	}
+
+	q := influx.NewQuery(fmt.Sprintf("SELECT object, version FROM %s WHERE subject = '%s' AND predicate = '%s' ORDER BY time DESC LIMIT 1", tuple.Context, tuple.Subject, tuple.Predicate), "tuples", "")
+	if response, err := n3ic.cl.Query(q); err == nil && response.Error() == nil {
+		if len(response.Results) > 0 && len(response.Results[0].Series) > 0 && len(response.Results[0].Series[0].Values) > 0 {
+			if response.Results[0].Series[0].Values[0][1] != nil {
+				tags["object"] = interface{}(response.Results[0].Series[0].Values[0][1]).(string)
+			} else {
+				tags["object"] = ""
+			}
+		}
+	}
 	pt, err := influx.NewPoint(tuple.Context, tags, fields, time.Now())
 	if err != nil {
 		return err
