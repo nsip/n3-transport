@@ -1,6 +1,9 @@
 // tuple.proto
 
+// 
 // generate with: protoc --go_out=. tuple.proto, in this folder
+// 
+// remember to do this any time fields are added or modified
 
 syntax = "proto3";
 
@@ -12,7 +15,11 @@ message SPOTuple {
 	string Object = 2; 		//e.g. Attribute name of a SIF object
 	string Predicate = 3; 	//e.g Value of an attribute
 	int64  Version = 4; 	//latest known version of this tuple
-	string Context = 5;		//model/domain context for this tuple
+	string Context = 5;		//model/domain context (scope) for this tuple
+	string User = 6;		//identifier of the user who created the tuple
+	string Signature = 7;	//pk signature of this message
+	string MsgID = 8;		//internal/correlation id for this message
 }
+
 
 
