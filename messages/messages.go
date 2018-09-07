@@ -58,7 +58,7 @@ func NewMessage(t *pb.SPOTuple) ([]byte, error) {
 // context for a user.
 //
 // user - requesting access for this user, if blank will be current system user
-//
+// topic - requesting user access for this topic
 //
 func NewTrustRequest(user, topic string) (*pb.SPOTuple, error) {
 
