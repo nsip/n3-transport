@@ -3,8 +3,6 @@ package n3tendermint
 import (
 	"log"
 
-	"github.com/gogo/protobuf/proto"
-	"github.com/nsip/n3-transport/pb"
 	"github.com/tendermint/tendermint/rpc/client"
 )
 
@@ -20,28 +18,6 @@ func NewPublisher() (*Publisher, error) {
 	}
 	n3c.bcp = bcClient
 	return n3c, nil
-}
-
-//
-// for the given spo primitives, constructs a mesasge suitable for use in
-// any of the transports
-//
-func (n3c *Publisher) NewMessage(subject, predicate, object, context string, version int64) ([]byte, error) {
-
-	tuple := &pb.SPOTuple{
-		Subject:   subject,
-		Predicate: predicate,
-		Object:    object,
-		Context:   context,
-		Version:   version,
-	}
-
-	pbTuple, err := proto.Marshal(tuple)
-	if err != nil {
-		return nil, err
-	}
-	return pbTuple, nil
-
 }
 
 func (n3c *Publisher) SubmitTx(tx []byte) error {
