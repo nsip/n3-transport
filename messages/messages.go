@@ -64,6 +64,10 @@ func NewTrustRequest(user, topic string) (*pb.SPOTuple, error) {
 
 }
 
+func NewTrustApproval(user, topic string) (*pb.SPOTuple, error) {
+
+}
+
 //
 // from a given protobuf message returns the tuple
 //
