@@ -7,7 +7,7 @@ import (
 	"time"
 
 	influx "github.com/influxdata/influxdb/client/v2"
-	"github.com/nsip/n3-transport/pb"
+	"github.com/nsip/n3-transport/messages/pb"
 )
 
 type Publisher struct {

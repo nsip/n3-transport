@@ -12,7 +12,9 @@ import (
 	liftbridge "github.com/liftbridge-io/go-liftbridge"
 	lbproto "github.com/liftbridge-io/go-liftbridge/liftbridge-grpc"
 	nats "github.com/nats-io/go-nats"
-	"github.com/nsip/n3-transport/pb"
+	"github.com/nats-io/nuid"
+	"github.com/nsip/n3-transport/messages"
+	"github.com/nsip/n3-transport/messages/pb"
 	"github.com/pkg/errors"
 )
 
@@ -20,14 +22,14 @@ type Publisher struct {
 	TRStream       liftbridge.StreamInfo            // stream definition for Trust Requests
 	TRContext      context.Context                  // conext to manage stream
 	trCtxCancel    func()                           // cancel func for context
-	trustRequests  []*pb.SPOTuple                   // slice of known trust requests
+	trustRegister  map[string]*pb.SPOTuple          // slice of known trust requests
 	TAStream       liftbridge.StreamInfo            // stream definition for Trust Approvals
 	TAContext      context.Context                  // context to manage stream
 	taCtxCancel    func()                           // cancel func for context
 	natsConn       *nats.Conn                       // connection to nats server for msg publishing
 	lbClient       liftbridge.Client                // connect to liftbridge streams
-	StreamRegistry map[string]liftbridge.StreamInfo // register of approved user streams
-	registryMutex  sync.Mutex                       // mutex to protect registry in multi-threads
+	streamRegister map[string]liftbridge.StreamInfo // register of approved user streams
+	registerMutex  sync.Mutex                       // mutex to protect registers in multi-threads
 }
 
 func NewPublisher() (*Publisher, error) {
@@ -51,8 +53,10 @@ func NewPublisher() (*Publisher, error) {
 	}
 	log.Println("liftbridge connection established")
 
-	// initialise the stream registry
-	registry := make(map[string]liftbridge.StreamInfo)
+	// initialise trust request registry
+	tr_register := make(map[string]*pb.SPOTuple)
+	// initialise the trust approval stream registry
+	str_register := make(map[string]liftbridge.StreamInfo)
 
 	// set up contexts for managing liftbridge interactions
 	trCtx, trCancelFunc := context.WithCancel(context.Background())
@@ -62,13 +66,13 @@ func NewPublisher() (*Publisher, error) {
 		TRStream:       trstream,
 		TRContext:      trCtx,
 		trCtxCancel:    trCancelFunc,
-		trustRequests:  make([]*pb.SPOTuple, 0),
+		trustRegister:  tr_register,
 		TAStream:       tastream,
 		TAContext:      taCtx,
 		taCtxCancel:    taCancelFunc,
 		natsConn:       natsconn,
 		lbClient:       lbclient,
-		StreamRegistry: registry,
+		streamRegister: str_register,
 	}
 	log.Println("candidate publisher created")
 
@@ -91,6 +95,86 @@ func NewPublisher() (*Publisher, error) {
 }
 
 //
+// Publish messages to the required stream
+//
+func (pub *Publisher) Publish(t *pb.SPOTuple) error {
+
+	// connect data to this user
+	err := pub.authoriseTuple(t)
+	if err != nil {
+		return errors.Wrap(err, "unable to authorise tuple for transmssion")
+	}
+
+	// Check()
+	//
+	// verify signed msg - TODO
+	// check whether stream is autorised
+	if !pub.authorisedStream(t) {
+		return errors.New("not authorised to publish to context: " + t.Context)
+	}
+
+	// Deliver()
+	//
+	tname := pub.getTargetTopicName(t)
+
+	// proto encode the message
+	msg, err := messages.NewMessage(t)
+	if err != nil {
+		return err
+	}
+
+	// messages are published to nats, not stream
+	if err := pub.natsConn.Publish(tname, msg); err != nil {
+		return errors.Wrap(err, "could not publish msg to nats")
+	}
+
+	return nil
+
+}
+
+//
+// given a data tuple add required user meta-data and signature
+//
+func (pub *Publisher) authoriseTuple(t *pb.SPOTuple) error {
+
+	t.User = "NSIP01"       // to be replaced with public key
+	t.Signature = "sig0001" // to be replaced with pk sig of message
+	t.MsgID = nuid.Next()
+
+	return nil
+
+}
+
+//
+// determines whether the user has access to the stream
+//
+func (pub *Publisher) authorisedStream(t *pb.SPOTuple) bool {
+	switch {
+	case t.Context == "TA":
+		return true
+	case t.Context == "TR":
+		return true
+	default:
+		return false // for now!
+	}
+}
+
+//
+// builds a nats topic name from the contents of the tuple
+// if tuple.Context is TA/TR these are the the topic names returned
+// otherwise topic is [tuple.Context].[tuple.User]
+//
+func (pub *Publisher) getTargetTopicName(t *pb.SPOTuple) string {
+
+	if t.Context == "TA" || t.Context == "TR" {
+		return t.Context
+	}
+
+	return fmt.Sprintf("%s.%s", t.Context, t.User)
+
+}
+
+//
 // subscribes to the trust request channel
 //
 func (pub *Publisher) startTRHandler() {
@@ -101,9 +185,19 @@ func (pub *Publisher) startTRHandler() {
 			log.Println("error in TR handler: ", err)
 			// return
 		}
-		log.Println(msg.Offset, string(msg.Value))
-		// create stream info based on TA
-		// add to registry
+
+		tuple, err := messages.Decode(msg.Value)
+		if err != nil {
+			log.Println(err)
+		}
+
+		// add the trust request to the registry
+		pub.registerMutex.Lock()
+		pub.trustRegister[tuple.MsgID] = tuple
+		pub.registerMutex.Unlock()
+
+		log.Println(msg.Offset, fmt.Sprintf("%v", tuple))
+
 	}
 
 	// create the subscription and run until context is cancelled
@@ -136,6 +230,7 @@ func (pub *Publisher) startTAHandler() {
 		log.Println(msg.Offset, string(msg.Value))
 		// create stream info based on TA
 		// add to registry
+		// create aggregate stream & also add to registry
 	}
 
 	// create the subscription and run until context is cancelled

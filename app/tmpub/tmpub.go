@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/nats-io/nuid"
+	"github.com/nsip/n3-transport/messages"
 	tm "github.com/nsip/n3-transport/n3tendermint"
 )
 
@@ -18,25 +19,23 @@ func main() {
 		log.Println(err)
 	}
 
-	memMap := make(map[string]int64)
-
-	for i := 0; i < 1000; i++ {
+	for i := 0; i < 100; i++ {
 
 		subject := "4BD6B062-66DD-474B-9E24-E3F85FB61FED" + nuid.Next()
 		predicate := "TeachingGroup.TeachingGroupPeriodList.TeachingGroupPeriod[1].DayId" + nuid.Next()
 		object := "F"
 		context := "SIF"
 
-		key := subject + predicate
-		memMap[key]++
-		version := memMap[key]
-
-		msg, err := tmPub.NewMessage(subject, predicate, object, context, version)
+		tuple, err := messages.NewTuple(subject, predicate, object, context)
 		if err != nil {
-			panic(err)
+			log.Fatal(err)
 		}
+		tuple.Version = 1 // arbitrary for testing
 
-		// log.Println("version: ", version)
+		msg, err := messages.NewMessage(tuple)
+		if err != nil {
+			log.Fatal(err)
+		}
 
 		err = tmPub.SubmitTx(msg)
 		if err != nil {
