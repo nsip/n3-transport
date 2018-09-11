@@ -62,9 +62,30 @@ func NewMessage(t *pb.SPOTuple) ([]byte, error) {
 //
 func NewTrustRequest(user, topic string) (*pb.SPOTuple, error) {
 
+	tr := &pb.SPOTuple{
+		Context:   "TR",
+		Subject:   user,
+		Predicate: "access",
+		Object:    topic,
+	}
+	return tr, nil
+
 }
 
-func NewTrustApproval(user, topic string) (*pb.SPOTuple, error) {
+//
+// create an approval record for this user to access
+// the topic as set out in the TR tuple provided.
+//
+func NewTrustApproval(trustRequest *pb.SPOTuple) (*pb.SPOTuple, error) {
+
+	ta := &pb.SPOTuple{
+		Context:   "TA",
+		Subject:   trustRequest.MsgID,
+		Predicate: "approved",
+		Object:    trustRequest.Object,
+	}
+
+	return ta, nil
 
 }
 

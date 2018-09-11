@@ -15,6 +15,7 @@ import (
 	"github.com/nats-io/nuid"
 	"github.com/nsip/n3-transport/messages"
 	"github.com/nsip/n3-transport/messages/pb"
+	tm "github.com/nsip/n3-transport/n3tendermint"
 	"github.com/pkg/errors"
 )
 
@@ -30,6 +31,7 @@ type Publisher struct {
 	lbClient       liftbridge.Client                // connect to liftbridge streams
 	streamRegister map[string]liftbridge.StreamInfo // register of approved user streams
 	registerMutex  sync.Mutex                       // mutex to protect registers in multi-threads
+	tmPub          *tm.Publisher                    // tendermint publisher client
 }
 
 func NewPublisher() (*Publisher, error) {
@@ -53,6 +55,13 @@ func NewPublisher() (*Publisher, error) {
 	}
 	log.Println("liftbridge connection established")
 
+	// connection to tendermint b/c
+	tmpub, err := tm.NewPublisher()
+	if err != nil {
+		return nil, errors.Wrap(err, "Tendermint connection failed")
+	}
+	log.Println("tendermint connection established")
+
 	// initialise trust request registry
 	tr_register := make(map[string]*pb.SPOTuple)
 	// initialise the trust approval stream registry
@@ -73,6 +82,7 @@ func NewPublisher() (*Publisher, error) {
 		natsConn:       natsconn,
 		lbClient:       lbclient,
 		streamRegister: str_register,
+		tmPub:          tmpub,
 	}
 	log.Println("candidate publisher created")
 
@@ -95,9 +105,28 @@ func NewPublisher() (*Publisher, error) {
 }
 
 //
-// Publish messages to the required stream
+// returns the current list of un-porcessed trust requests
 //
-func (pub *Publisher) Publish(t *pb.SPOTuple) error {
+func (pub *Publisher) TrustRequests() ([]*pb.SPOTuple, error) {
+
+	trs := make([]*pb.SPOTuple, 0)
+	pub.registerMutex.Lock()
+	for _, tr := range pub.trustRegister {
+		trs = append(trs, tr)
+	}
+	pub.registerMutex.Unlock()
+
+	return trs, nil
+
+}
+
+//
+// Publish messages to the required stream
+// Takes a new SPO Tuple and adds user details, signature etc.
+// Validates user for the chosen stream using Check() internally
+// Publishes to the stream using Deliver()
+//
+func (pub *Publisher) PublishToStream(t *pb.SPOTuple) error {
 
 	// connect data to this user
 	err := pub.authoriseTuple(t)
@@ -105,16 +134,76 @@ func (pub *Publisher) Publish(t *pb.SPOTuple) error {
 		return errors.Wrap(err, "unable to authorise tuple for transmssion")
 	}
 
-	// Check()
-	//
+	// validation checks
+	err = pub.Check(t)
+	if err != nil {
+		return err
+	}
+
+	// publish
+	err = pub.Deliver(t)
+	if err != nil {
+		return err
+	}
+
+	return nil
+
+}
+
+//
+// Publish message to the blockchain transport which will then
+// distribute to all other b/c nodes.
+// Takes a new SPO Tuple and adds user details, signature etc.
+// Only the initial Check() validation is run, as decision to Deliver()
+// is made by the blockchain validators themselves
+//
+func (pub *Publisher) PublishToBlockchain(t *pb.SPOTuple) error {
+
+	// connect data to this user
+	err := pub.authoriseTuple(t)
+	if err != nil {
+		return errors.Wrap(err, "unable to authorise tuple for transmssion")
+	}
+
+	// validation checks
+	err = pub.Check(t)
+	if err != nil {
+		return err
+	}
+
+	// publish
+	err = pub.bcDeliver(t)
+	if err != nil {
+		return err
+	}
+
+	return nil
+
+}
+
+//
+// Check, runs basic validation on a supplied tuple
+// checks signature against content and validates that this
+// user is allowed to publish to this stream (context)
+//
+func (pub *Publisher) Check(t *pb.SPOTuple) error {
+
 	// verify signed msg - TODO
 	// check whether stream is autorised
 	if !pub.authorisedStream(t) {
 		return errors.New("not authorised to publish to context: " + t.Context)
 	}
 
-	// Deliver()
-	//
+	return nil
+
+}
+
+//
+// Deliver, publishes the message to the streaming service
+// to the stream specified by tuple.Context
+//
+func (pub *Publisher) Deliver(t *pb.SPOTuple) error {
+
 	tname := pub.getTargetTopicName(t)
 
 	// proto encode the message
@@ -133,6 +222,27 @@ func (pub *Publisher) Publish(t *pb.SPOTuple) error {
 }
 
 //
+// bcDeliver, publishes the message to the blockchain transport
+// unexported method as should only be called via PublishToBlockchain
+//
+func (pub *Publisher) bcDeliver(t *pb.SPOTuple) error {
+
+	// proto encode the message
+	msg, err := messages.NewMessage(t)
+	if err != nil {
+		return err
+	}
+
+	err = pub.tmPub.SubmitTx(msg)
+	if err != nil {
+		return errors.Wrap(err, "could not pubish to tendermint")
+	}
+
+	return nil
+
+}
+
+//
 // given a data tuple add required user meta-data and signature
 //
 func (pub *Publisher) authoriseTuple(t *pb.SPOTuple) error {
@@ -140,6 +250,7 @@ func (pub *Publisher) authoriseTuple(t *pb.SPOTuple) error {
 	t.User = "NSIP01"       // to be replaced with public key
 	t.Signature = "sig0001" // to be replaced with pk sig of message
 	t.MsgID = nuid.Next()
+	t.Version = 0 // should come from CMS when integrated
 
 	return nil
 
@@ -155,7 +266,10 @@ func (pub *Publisher) authorisedStream(t *pb.SPOTuple) bool {
 	case t.Context == "TR":
 		return true
 	default:
-		return false // for now!
+		userKey := pub.getTargetTopicName(t)
+		// log.Println("userkey: ", userKey)
+		_, ok := pub.streamRegister[userKey]
+		return ok
 	}
 }
 
@@ -183,12 +297,13 @@ func (pub *Publisher) startTRHandler() {
 	handler := func(msg *lbproto.Message, err error) {
 		if err != nil {
 			log.Println("error in TR handler: ", err)
-			// return
+			return
 		}
 
 		tuple, err := messages.Decode(msg.Value)
 		if err != nil {
 			log.Println(err)
+			return
 		}
 
 		// add the trust request to the registry
@@ -196,7 +311,7 @@ func (pub *Publisher) startTRHandler() {
 		pub.trustRegister[tuple.MsgID] = tuple
 		pub.registerMutex.Unlock()
 
-		log.Println(msg.Offset, fmt.Sprintf("%v", tuple))
+		// log.Println("TR: ", msg.Offset, fmt.Sprintf("%v", tuple))
 
 	}
 
@@ -225,12 +340,28 @@ func (pub *Publisher) startTAHandler() {
 	handler := func(msg *lbproto.Message, err error) {
 		if err != nil {
 			log.Println("error in TA handler: ", err)
-			// return
+			return
 		}
-		log.Println(msg.Offset, string(msg.Value))
-		// create stream info based on TA
-		// add to registry
-		// create aggregate stream & also add to registry
+
+		taTuple, err := messages.Decode(msg.Value)
+		if err != nil {
+			log.Println(err)
+			return
+		}
+
+		// log.Println("TA: ", msg.Offset, fmt.Sprintf("%v", taTuple))
+
+		// check TA against approvl rules
+		if !pub.meetsApprovalRules(taTuple) {
+			log.Println("TR not yet approved, does not meet rules.")
+			return
+		}
+		// create approved streams based on TA
+		err = pub.createApprovedStreams(taTuple)
+		if err != nil {
+			log.Println("unable to create approved streams: ", err)
+			return
+		}
 	}
 
 	// create the subscription and run until context is cancelled
@@ -248,6 +379,13 @@ func (pub *Publisher) startTAHandler() {
 
 	log.Println("...TA handler up")
 
+}
+
+//
+// enforces approval rules for access to streams
+//
+func (pub *Publisher) meetsApprovalRules(ta *pb.SPOTuple) bool {
+	return true // obviously change this!!!
 }
 
 //
@@ -328,30 +466,62 @@ func createTAStreamInfo() liftbridge.StreamInfo {
 }
 
 //
+// from the TA tuple, ensure that the relevant streams
+// exist.
 //
-//
-func createStream(userid string) error {
+func (pub *Publisher) createApprovedStreams(ta *pb.SPOTuple) error {
 
-	if userid == "" {
-		return errors.New("cannot have zero-length userid")
+	req, ok := pub.trustRegister[ta.Subject]
+	if !ok {
+		return errors.New("no request found for TA")
 	}
 
-	addr := "localhost:9292"
-	client, err := liftbridge.Connect([]string{addr})
-	if err != nil {
-		return err
+	userSubject := fmt.Sprintf("%s.%s", ta.Object, req.Subject)
+	userStreamName := fmt.Sprintf("%s.%s-stream", ta.Object, req.Subject)
+	aggregateSubject := fmt.Sprintf("%s.*", ta.Object)
+	aggregateStreamName := fmt.Sprintf("%s.stream", ta.Object)
+
+	// see if already created
+	pub.registerMutex.Lock()
+	_, ok = pub.streamRegister[userSubject]
+	pub.registerMutex.Unlock()
+	if ok {
+		return nil
 	}
-	defer client.Close()
-	stream := liftbridge.StreamInfo{
-		Subject:           userid,
-		Name:              userid + "-stream",
+
+	// create streaminfo for desired stream/user combination
+	userStream := liftbridge.StreamInfo{
+		Subject:           userSubject,
+		Name:              userStreamName,
 		ReplicationFactor: 1,
 	}
-	if err := client.CreateStream(context.Background(), stream); err != nil {
+	// create stream info for aggregate stream
+	aggregateStream := liftbridge.StreamInfo{
+		Subject:           aggregateSubject,
+		Name:              aggregateStreamName,
+		ReplicationFactor: 1,
+	}
+
+	// create streams on broker, ignore errors if alsready created
+	if err := pub.lbClient.CreateStream(context.Background(), userStream); err != nil {
 		if err != liftbridge.ErrStreamExists {
 			return err
 		}
 	}
-	fmt.Println("created stream ", stream.Name)
+	log.Println("created user stream - ", userStream.Name)
+
+	if err := pub.lbClient.CreateStream(context.Background(), aggregateStream); err != nil {
+		if err != liftbridge.ErrStreamExists {
+			return err
+		}
+	}
+	log.Println("created aggregate stream - ", aggregateStream.Name)
+
+	// store infos in stream registry as approved routes -- for user!!!
+	pub.registerMutex.Lock()
+	pub.streamRegister[userSubject] = userStream
+	pub.registerMutex.Unlock()
+
+	log.Println("approved streams created & registered")
 	return nil
 }
