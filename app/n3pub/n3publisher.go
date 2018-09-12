@@ -1,4 +1,4 @@
-// publisher.go
+// n3publisher.go
 
 package main
 
@@ -7,14 +7,14 @@ import (
 	"time"
 
 	"github.com/nats-io/nuid"
+	n3transport "github.com/nsip/n3-transport"
 	cmn "github.com/nsip/n3-transport/common"
 	"github.com/nsip/n3-transport/messages"
-	"github.com/nsip/n3-transport/n3liftbridge"
 )
 
 func main() {
 
-	n3pub, err := n3liftbridge.NewPublisher()
+	n3pub, err := n3transport.NewPublisher()
 	if err != nil {
 		log.Fatalln("Fatal error starting publisher: ", err)
 	}
