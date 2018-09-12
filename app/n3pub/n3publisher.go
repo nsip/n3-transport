@@ -68,8 +68,7 @@ func main() {
 	// // send some messages
 	log.Println("sending messages...")
 
-	for i := 0; i < 300; i++ {
-
+	for i := 0; i < 10000; i++ {
 		subject := nuid.Next()
 		predicate := nuid.Next()
 		object := nuid.Next()

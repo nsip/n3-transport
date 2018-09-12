@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"log"
 	"sync"
-	"time"
 
 	liftbridge "github.com/liftbridge-io/go-liftbridge"
 	lbproto "github.com/liftbridge-io/go-liftbridge/liftbridge-grpc"
@@ -432,9 +431,6 @@ func (pub *Publisher) Close() error {
 		return err
 	}
 	pub.natsConn.Close()
-
-	log.Println("waiting for close...")
-	time.Sleep(time.Second * 2)
 
 	return nil
 

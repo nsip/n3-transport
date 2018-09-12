@@ -113,3 +113,18 @@ func (iv *InfluxConnector) startStreamHandler() {
 	log.Println("...Stream handler up")
 
 }
+
+//
+// ensure all connections cleanly closed.
+//
+func (ic *InfluxConnector) Close() error {
+
+	log.Println("closing liftbridge connection")
+	err := ic.lbClient.Close()
+	if err != nil {
+		return err
+	}
+
+	return nil
+
+}
