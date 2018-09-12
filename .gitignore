@@ -2,3 +2,4 @@
 app/influxpub/influxpub
 app/tmpub/tmpub
 app/n3pub/n3pub
+app/s2i/s2i
