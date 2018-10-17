@@ -27,7 +27,7 @@ func NewPublisher(host string, port int) (*Publisher, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to create grpc client")
 	}
-	stream, err := client.Publish(context.Background()) // TODO: maybe manage this ctx - Close()
+	stream, err := client.Publish(context.Background())
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to create stream connection to server")
 	}

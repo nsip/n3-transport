@@ -26,7 +26,7 @@ func main() {
 
 	tuple, err := messages.NewTuple("subject1", "predicate1longlonglonglonglonglonglonglong", "obj1")
 
-	for i := 0; i < 5; i++ {
+	for i := 0; i < 1000; i++ {
 		tuple.Version = int64(i)
 		err = n3pub.Publish(tuple, namespace, contextName)
 		if err != nil {

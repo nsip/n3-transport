@@ -6,7 +6,6 @@ import (
 	"log"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	nats "github.com/nats-io/go-nats"
 )
 
@@ -30,9 +29,7 @@ func Join(nc *nats.Conn, userid string) (string, error) {
 		return "", err
 	}
 
-	spew.Dump(msg.Data)
 	dispatcherid := string(msg.Data)
-	spew.Dump(dispatcherid)
 
 	log.Println("join ok")
 	log.Println("received dispatcher id: ", dispatcherid)
