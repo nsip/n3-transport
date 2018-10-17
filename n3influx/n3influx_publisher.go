@@ -9,6 +9,7 @@ import (
 
 	influx "github.com/influxdata/influxdb/client/v2"
 	"github.com/nsip/n3-transport/messages/pb"
+	"github.com/spf13/viper"
 )
 
 type Publisher struct {
@@ -38,8 +39,15 @@ func (n3ic *Publisher) Query(q influx.Query) (*influx.Response, error) {
 
 func influxClient() (influx.Client, error) {
 
+	influxAddr := viper.GetString("influx_addr")
+	if influxAddr == "" {
+		// if not in config try default
+		influxAddr = "http://localhost:8086"
+	}
+	log.Println("connecting to influx on: ", influxAddr)
+
 	c, err := influx.NewHTTPClient(influx.HTTPConfig{
-		Addr: "http://localhost:8086",
+		Addr: influxAddr,
 		// Username: username,
 		// Password: password,
 	})
@@ -104,7 +112,7 @@ func (n3ic *Publisher) startStorageHandler() {
 //
 // send the tuple to influx, passes into batching storage handler
 //
-func (n3ic *Publisher) StoreTuple(tuple *pb.SPOTuple) error {
+func (n3ic *Publisher) StoreTuple(tuple *pb.SPOTuple, contextName string) error {
 	// don't publish empty objects (deletion markers): we have tombstoning for that
 	if len(tuple.Object) == 0 {
 		return nil
@@ -123,7 +131,7 @@ func (n3ic *Publisher) StoreTuple(tuple *pb.SPOTuple) error {
 		// "object":    tuple.Object,
 	}
 
-	pt, err := influx.NewPoint(tuple.Context, tags, fields, time.Now())
+	pt, err := influx.NewPoint(contextName, tags, fields, time.Now())
 	if err != nil {
 		return err
 	}
@@ -134,7 +142,7 @@ func (n3ic *Publisher) StoreTuple(tuple *pb.SPOTuple) error {
 }
 
 // "delete" the tuple: tuple is stored but tombstoned
-func (n3ic *Publisher) DeleteTuple(tuple *pb.SPOTuple) error {
+func (n3ic *Publisher) DeleteTuple(tuple *pb.SPOTuple, contextName string) error {
 
 	// extract data from tuple and use to construct point
 	tags := map[string]string{
@@ -149,7 +157,7 @@ func (n3ic *Publisher) DeleteTuple(tuple *pb.SPOTuple) error {
 		// "object":    tuple.Object,
 	}
 
-	q := influx.NewQuery(fmt.Sprintf("SELECT object, version FROM %s WHERE subject = '%s' AND predicate = '%s' ORDER BY time DESC LIMIT 1", tuple.Context, tuple.Subject, tuple.Predicate), "tuples", "")
+	q := influx.NewQuery(fmt.Sprintf("SELECT object, version FROM %s WHERE subject = '%s' AND predicate = '%s' ORDER BY time DESC LIMIT 1", contextName, tuple.Subject, tuple.Predicate), "tuples", "")
 	if response, err := n3ic.cl.Query(q); err == nil && response.Error() == nil {
 		if len(response.Results) > 0 && len(response.Results[0].Series) > 0 && len(response.Results[0].Series[0].Values) > 0 {
 			if response.Results[0].Series[0].Values[0][1] != nil {
@@ -159,7 +167,7 @@ func (n3ic *Publisher) DeleteTuple(tuple *pb.SPOTuple) error {
 			}
 		}
 	}
-	pt, err := influx.NewPoint(tuple.Context, tags, fields, time.Now())
+	pt, err := influx.NewPoint(contextName, tags, fields, time.Now())
 	if err != nil {
 		return err
 	}
