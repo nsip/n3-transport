@@ -4,9 +4,7 @@ package n3crypto
 
 import (
 	"crypto/rand"
-	"log"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/kevinburke/nacl"
 	"github.com/kevinburke/nacl/box"
 	"github.com/nsip/n3-transport/messages"
@@ -61,9 +59,7 @@ func EncryptTuple(t *pb.SPOTuple, recipientPublicKey, senderPrivateKey string) (
 
 	// decode keys
 	recipientKey, err := B58Decode(recipientPublicKey)
-	log.Println("encrypt: recipient pub key: ", recipientPublicKey)
 	senderKey, err := B58Decode(senderPrivateKey)
-	log.Println("encrypt: sender priv key: ", senderPrivateKey)
 	if err != nil {
 		return nil, err
 	}
@@ -76,8 +72,6 @@ func EncryptTuple(t *pb.SPOTuple, recipientPublicKey, senderPrivateKey string) (
 
 	// encrypt the tuple bytes
 	encryptedTuple := box.EasySeal(tupleBytes, recipientKey, senderKey)
-	log.Printf("encrypted bytes:\n\n%v\n\n", encryptedTuple)
-	spew.Dump(encryptedTuple)
 
 	return encryptedTuple, nil
 }
@@ -89,21 +83,14 @@ func DecryptTuple(tbytes []byte, senderPublicKey, recipientPrivateKey string) (*
 
 	// decode keys
 	senderKey, err := B58Decode(senderPublicKey)
-	log.Println("decrypt: sender pub key: ", senderPublicKey)
 	recipientKey, err := B58Decode(recipientPrivateKey)
-	log.Println("decrypt: recip priv key: ", recipientPrivateKey)
 	if err != nil {
 		return nil, err
 	}
 
-	log.Println("decrypt: tuple bytes received:")
-	spew.Dump(tbytes)
-
 	// decrypt the tuple bytes
 	unencrpytedTupleBytes, err := box.EasyOpen(tbytes, senderKey, recipientKey)
 	if err != nil {
-		log.Println("open error")
-		log.Printf("tbytes:\n\n%v\n\n", tbytes)
 		return nil, err
 	}
 

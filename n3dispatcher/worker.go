@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/davecgh/go-spew/spew"
 	lbproto "github.com/liftbridge-io/go-liftbridge/liftbridge-grpc"
 	"github.com/nsip/n3-transport/messages"
 	"github.com/nsip/n3-transport/messages/pb"
@@ -31,25 +30,19 @@ func startWorker(cfg *workerConfig) error {
 			return
 		}
 
-		spew.Dump(msg.Value)
 		n3msg, err := messages.DecodeN3Message(msg.Value)
 		if err != nil {
 			log.Println("worker unable to decode message: ", err)
 			return
 		}
-		log.Printf("worker msg rcvd:\n\n%v\n\n", n3msg)
-		spew.Dump(n3msg)
 
 		// check msg routing to see if we're interested
 		msgScope := fmt.Sprintf("%s.%s", n3msg.NameSpace, n3msg.CtxName)
 		if msgScope != cfg.scope {
-			log.Println("worker received msg for", msgScope, " ignoring.")
+			// log.Println("worker received msg for", msgScope, " ignoring.")
 			return
 		}
-		log.Println("worker received msg for", msgScope, " will process.")
-
-		log.Printf("tuple is:\n\n%v\n\n", n3msg.Payload)
-		spew.Dump(n3msg.Payload)
+		// log.Println("worker received msg for", msgScope, " will process.")
 
 		// if we are, decrypt the payload
 		// and re-crypt for the target user
@@ -58,8 +51,6 @@ func startWorker(cfg *workerConfig) error {
 			log.Println("worker unable to decrypt message tuple: ", err)
 			return
 		}
-		log.Println("payload decoded:")
-		spew.Dump(tuple)
 		recrypted, err := n3crypto.EncryptTuple(tuple, cfg.user, cfg.disp.privKey)
 		if err != nil {
 			log.Println("encryption error in worker: ", err)
@@ -82,7 +73,7 @@ func startWorker(cfg *workerConfig) error {
 			log.Println("worker failed to publish message: ", err)
 			return
 		}
-		log.Println("worker sent message to: ", cfg.user)
+		// log.Println("worker sent message to: ", cfg.user)
 
 	}
 

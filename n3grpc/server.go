@@ -8,7 +8,6 @@ import (
 	"log"
 	"net"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/nsip/n3-transport/messages/pb"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
@@ -95,7 +94,6 @@ func (s *APIServer) Publish(stream pb.API_PublishServer) error {
 		}
 		// do something with the msg
 		s.msgHandler(n3msg)
-		spew.Dump(n3msg)
 		msgCount++
 
 	}

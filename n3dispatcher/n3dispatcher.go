@@ -13,7 +13,6 @@ import (
 	nats "github.com/nats-io/go-nats"
 	"github.com/nsip/n3-transport/messages"
 	"github.com/nsip/n3-transport/n3config"
-	"github.com/nsip/n3-transport/n3crypto"
 	"github.com/nsip/n3-transport/n3liftbridge"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
@@ -109,32 +108,6 @@ func initConfig() {
 	}
 
 	log.Println("Using config file:", viper.ConfigFileUsed())
-}
-
-//
-// builds a default configuration for the dispatcher
-//
-func createDefaultConfig() {
-
-	// server addresses
-	viper.Set("nats_addr", "nats://localhost:4222")
-	viper.Set("lb_addr", "localhost:9292")
-
-	// nacl keys
-	pubkey, privkey, err := n3crypto.GenerateKeys()
-	if err != nil {
-		// no point continuing without crypto
-		log.Fatal("unable to create crypto keys: ", err)
-	}
-	viper.Set("pubkey", pubkey)
-	viper.Set("privkey", privkey)
-
-	// save the config
-	err = viper.WriteConfig()
-	if err != nil {
-		log.Println("config write err: ", err)
-	}
-
 }
 
 //

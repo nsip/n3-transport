@@ -176,12 +176,3 @@ func (n3ic *Publisher) DeleteTuple(tuple *pb.SPOTuple, contextName string) error
 
 	return nil
 }
-
-//
-//
-//
-func spacer() {}
-
-//
-//
-//

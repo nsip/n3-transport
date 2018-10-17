@@ -8,7 +8,6 @@ import (
 	"log"
 	"sync"
 
-	"github.com/davecgh/go-spew/spew"
 	liftbridge "github.com/liftbridge-io/go-liftbridge"
 	lbproto "github.com/liftbridge-io/go-liftbridge/liftbridge-grpc"
 	nats "github.com/nats-io/go-nats"
@@ -157,7 +156,7 @@ func (n3c *N3Node) startApprovalHandler() error {
 		// decode the internal tuple
 		approvalTuple, err := messages.DecodeTuple(n3msg.Payload)
 		if err != nil {
-			log.Println("node cannot decode tuple proto: ", err)
+			log.Println("node cannot decode approval tuple proto: ", err)
 			return
 		}
 
@@ -208,9 +207,6 @@ func (n3c *N3Node) startWriteHandler() error {
 	// set up handler for inbound messages
 	handler := func(n3msg *pb.N3Message) {
 
-		log.Println("write handler got a message")
-		spew.Dump(n3msg)
-
 		// force sender id to be this node
 		n3msg.SndId = n3c.pubKey
 
@@ -220,8 +216,6 @@ func (n3c *N3Node) startWriteHandler() error {
 			log.Println("write handler cannot decode tuple: ", err)
 			return
 		}
-		log.Printf("write handler decoded tuple:\n\n%v\n\n", tuple)
-		spew.Dump(tuple)
 
 		// check authorisation
 		approvalScope := fmt.Sprintf("%s.%s.%s", n3msg.SndId, n3msg.NameSpace, n3msg.CtxName)
@@ -243,8 +237,6 @@ func (n3c *N3Node) startWriteHandler() error {
 			log.Println("write handler unable to encrypt tuple: ", err)
 			return
 		}
-		log.Printf("write handler encrypted tuple:\n\n%v\n\n ", encryptedTuple)
-		spew.Dump(encryptedTuple)
 
 		newMsg := &pb.N3Message{
 			Payload:   encryptedTuple,
@@ -255,16 +247,12 @@ func (n3c *N3Node) startWriteHandler() error {
 		}
 
 		// encode & send
-		// n3msg.Payload = encryptedTuple
-		log.Printf("new message is:\n\n%v\n\n ", newMsg)
-		spew.Dump(newMsg)
-		log.Printf("new message payload is:\n\n%v\n\n", newMsg.Payload)
 		msgBytes, err := messages.EncodeN3Message(newMsg)
 		if err != nil {
 			log.Println("write handler unable to encode message: ", err)
 			return
 		}
-		spew.Dump(msgBytes)
+
 		err = n3c.natsConn.Publish(dispatcherid, msgBytes)
 		if err != nil {
 			log.Println("write handler unable to publish message: ", err)
@@ -311,8 +299,6 @@ func (n3c *N3Node) startReadHandler() error {
 
 	// set up message handler
 	handler := func(msg *lbproto.Message, err error) {
-		log.Println("message received by node read handler:")
-		spew.Dump(msg.Value)
 
 		// decode msg from transport format
 		n3msg, err := messages.DecodeN3Message(msg.Value)
@@ -320,10 +306,7 @@ func (n3c *N3Node) startReadHandler() error {
 			log.Println("node read handler cannot decode message proto: ", err)
 			return
 		}
-		log.Println("node received message from:", n3msg.SndId)
-
-		log.Println("payload is:")
-		spew.Dump(n3msg.Payload)
+		// log.Println("node received message from:", n3msg.SndId)
 
 		// unpack payload - decrypt and unmarshal
 		tuple, err := n3crypto.DecryptTuple(n3msg.Payload, n3msg.DispId, n3c.privKey)
@@ -331,16 +314,13 @@ func (n3c *N3Node) startReadHandler() error {
 			log.Println("read handler decrypt error: ", err)
 			return
 		}
-		log.Println("tuple received by read handler:")
-		spew.Dump(tuple)
 
-		log.Println("storing to influx...")
 		err = pub.StoreTuple(tuple, n3msg.CtxName)
 		if err != nil {
 			log.Println("error storing tuple:", err)
 			return
 		}
-		log.Println("...tuple stored successfully.")
+		// log.Println("...tuple stored successfully.")
 
 	}
 
