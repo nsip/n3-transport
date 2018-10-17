@@ -15,7 +15,7 @@ import (
 //
 // create a new tuple, validating all fields have been provided
 //
-func NewTuple(subject, predicate, object, context string) (*pb.SPOTuple, error) {
+func NewTuple(subject, predicate, object string) (*pb.SPOTuple, error) {
 
 	if subject == "" {
 		return nil, errors.New("subject must be provided")
@@ -27,72 +27,65 @@ func NewTuple(subject, predicate, object, context string) (*pb.SPOTuple, error) 
 
 	// nil objects are allowed to 'remove' existing values
 
-	if context == "" {
-		return nil, errors.New("context must be provided")
-	}
-
 	tuple := &pb.SPOTuple{
 		Subject:   strings.TrimSpace(subject),
 		Predicate: strings.TrimSpace(predicate),
 		Object:    strings.TrimSpace(object),
-		Context:   strings.TrimSpace(context),
 	}
 
 	return tuple, nil
 }
 
 //
-// returns a protobuf encoded tuple for transmission
+// returns a protobuf encoded message for transmission
 //
-func NewMessage(t *pb.SPOTuple) ([]byte, error) {
+func NewMessage(payload []byte, sender, namespace, contextName string) ([]byte, error) {
 
-	pbTuple, err := proto.Marshal(t)
+	msg := &pb.N3Message{
+		Payload:   payload,
+		SndId:     sender,
+		NameSpace: namespace,
+		CtxName:   contextName,
+	}
+
+	pbMsg, err := EncodeN3Message(msg)
 	if err != nil {
-		return nil, errors.Wrap(err, "protobuf encoding failed for tuple:")
+		return nil, err
 	}
-	return pbTuple, nil
+
+	return pbMsg, nil
 }
 
 //
-// returns a specialised tuple used for requesting access to
-// context for a user.
+// retrieve n3message from protobuf transmission format
 //
-// user - requesting access for this user, if blank will be current system user
-// topic - requesting user access for this topic
-//
-func NewTrustRequest(user, topic string) (*pb.SPOTuple, error) {
+func DecodeN3Message(message []byte) (*pb.N3Message, error) {
 
-	tr := &pb.SPOTuple{
-		Context:   "TR",
-		Subject:   user,
-		Predicate: "access",
-		Object:    topic,
+	n3msg := &pb.N3Message{}
+	if err := proto.Unmarshal(message, n3msg); err != nil {
+		return nil, errors.Wrap(err, "unable to decode n3 msg from protbuf message:")
 	}
-	return tr, nil
+
+	return n3msg, nil
 
 }
 
 //
-// create an approval record for this user to access
-// the topic as set out in the TR tuple provided.
+// returns a protobuf encoded tuple for transmission / encryption
 //
-func NewTrustApproval(trustRequest *pb.SPOTuple) (*pb.SPOTuple, error) {
+func EncodeN3Message(m *pb.N3Message) ([]byte, error) {
 
-	ta := &pb.SPOTuple{
-		Context:   "TA",
-		Subject:   trustRequest.MsgID,
-		Predicate: "approved",
-		Object:    trustRequest.Object,
+	n3msg, err := proto.Marshal(m)
+	if err != nil {
+		return nil, errors.Wrap(err, "protobuf encoding failed for message:")
 	}
-
-	return ta, nil
-
+	return n3msg, nil
 }
 
 //
 // from a given protobuf message returns the tuple
 //
-func Decode(message []byte) (*pb.SPOTuple, error) {
+func DecodeTuple(message []byte) (*pb.SPOTuple, error) {
 
 	tuple := &pb.SPOTuple{}
 	if err := proto.Unmarshal(message, tuple); err != nil {
@@ -101,4 +94,16 @@ func Decode(message []byte) (*pb.SPOTuple, error) {
 
 	return tuple, nil
 
+}
+
+//
+// returns a protobuf encoded tuple for transmission / encryption
+//
+func EncodeTuple(t *pb.SPOTuple) ([]byte, error) {
+
+	pbTuple, err := proto.Marshal(t)
+	if err != nil {
+		return nil, errors.Wrap(err, "protobuf encoding failed for tuple:")
+	}
+	return pbTuple, nil
 }

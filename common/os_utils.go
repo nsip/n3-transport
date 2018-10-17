@@ -123,6 +123,10 @@ func MustWriteFile(filePath string, contents []byte, mode os.FileMode) {
 	}
 }
 
+func SetEnv(key, value string) error {
+	return os.Setenv(key, value)
+}
+
 //--------------------------------------------------------------------------------
 
 func Prompt(prompt string, defaultValue string) (string, error) {
