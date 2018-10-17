@@ -3,3 +3,7 @@ app/influxpub/influxpub
 app/tmpub/tmpub
 app/n3pub/n3pub
 app/s2i/s2i
+app/dispatcher/dispatcher
+app/node/n3cli
+app/node/node
+app/test/n3pub/n3pub
