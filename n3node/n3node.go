@@ -292,12 +292,19 @@ func (n3c *N3Node) startReadHandler() error {
 
 	// start up the influx publisher
 	// TODO: abstract multi-db handlers to channel reader
+	// to multiplex send to different data-stores
 	pub, err := n3influx.NewPublisher()
 	if err != nil {
 		return errors.Wrap(err, "read handler cannot connect to influx store:")
 	}
 
 	// set up message handler
+	lastMessageOffset := viper.GetInt64(n3c.pubKey)
+	var nextMessage int64
+	if lastMessageOffset != 0 {
+		nextMessage = lastMessageOffset + 1
+	}
+	log.Println("consming messages offset from:", nextMessage)
 	handler := func(msg *lbproto.Message, err error) {
 
 		// decode msg from transport format
@@ -321,6 +328,7 @@ func (n3c *N3Node) startReadHandler() error {
 			return
 		}
 		// log.Println("...tuple stored successfully.")
+		lastMessageOffset = msg.Offset
 
 	}
 
@@ -331,12 +339,14 @@ func (n3c *N3Node) startReadHandler() error {
 	// create the subscription and run until context is cancelled
 	go func() {
 		streamName := fmt.Sprintf("%s-stream", n3c.pubKey)
-		err := n3c.lbConn.Subscribe(ctx, n3c.pubKey, streamName, handler)
+		err := n3c.lbConn.Subscribe(ctx, n3c.pubKey, streamName, handler, liftbridge.StartAtOffset(nextMessage))
 		if err != nil {
 			log.Println("node error subscribing read handler: ", err)
 			n3c.removeHandlerContext(n3c.pubKey)
 		}
 		<-ctx.Done()
+		// store the last read position
+		viper.Set(n3c.pubKey, lastMessageOffset)
 	}()
 
 	return nil
@@ -387,6 +397,12 @@ func (n3c *N3Node) Close() {
 	// close all handlers by invoking cancelfunc on associated contexts
 	for name, _ := range n3c.handlerContexts {
 		n3c.removeHandlerContext(name)
+	}
+
+	// save the config file, to remember client read position
+	err := n3config.SaveConfig()
+	if err != nil {
+		log.Println("unable to save config:", err)
 	}
 
 	log.Println("node successfully shut down")
