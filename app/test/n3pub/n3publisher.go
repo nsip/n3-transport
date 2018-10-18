@@ -3,6 +3,7 @@
 package main
 
 import (
+	"flag"
 	"log"
 
 	"github.com/nsip/n3-transport/messages"
@@ -15,6 +16,10 @@ import (
 //
 func main() {
 
+	numMessages := flag.Int("n", 1000, "number of messages to publish")
+
+	flag.Parse()
+
 	n3pub, err := n3grpc.NewPublisher("localhost", 5777)
 	if err != nil {
 		log.Fatalln("cannot create publisher:", err)
@@ -26,7 +31,7 @@ func main() {
 
 	tuple, err := messages.NewTuple("subject1", "predicate1longlonglonglonglonglonglonglong", "obj1")
 
-	for i := 0; i < 1000; i++ {
+	for i := 0; i < *numMessages; i++ {
 		tuple.Version = int64(i)
 		err = n3pub.Publish(tuple, namespace, contextName)
 		if err != nil {
