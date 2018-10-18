@@ -37,13 +37,10 @@ var ConfigNotFoundError = errors.New("no config file found")
 func ReadConfig() error {
 
 	if configExists() {
-		// get current working directory
-		cwd, err := os.Getwd()
+		configDir, err := getConfigDir()
 		if err != nil {
-			return errors.Wrap(err, "cannot establish cwd:")
+			return err
 		}
-		// log.Println("cwd:", cwd)
-		configDir := fmt.Sprintf("%s/config", cwd)
 
 		// set up viper
 		viper.SetConfigName(cfgFileName)
@@ -72,13 +69,10 @@ func ReadConfig() error {
 //
 func CreateBaseConfig() error {
 
-	// get current working directory
-	cwd, err := os.Getwd()
+	configDir, err := getConfigDir()
 	if err != nil {
-		return errors.Wrap(err, "cannot establish cwd:")
+		return err
 	}
-	// log.Println("cwd:", cwd)
-	configDir := fmt.Sprintf("%s/config", cwd)
 
 	// ensure required folder exists
 	err = common.EnsureDir(configDir, os.ModePerm)
@@ -134,7 +128,49 @@ func CreateBaseConfig() error {
 }
 
 //
-// checks if a config can be found in the expected path
+// writes the current state of the config to file
+//
+func SaveConfig() error {
+
+	configDir, err := getConfigDir()
+	if err != nil {
+		return err
+	}
+
+	// set up viper
+	viper.SetConfigName(cfgFileName)
+	viper.SetConfigType(cfgFileType)
+	viper.AddConfigPath(configDir)
+
+	// write the new config file
+	err = viper.WriteConfig()
+	if err != nil {
+		return errors.Wrap(err, "createBaseConfig failed, cannot save config file: ")
+	} else {
+		log.Println("new config written.", viper.ConfigFileUsed())
+	}
+
+	return nil
+}
+
+//
+// gets the expected config directory
+//
+func getConfigDir() (string, error) {
+
+	// get current working directory
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", errors.Wrap(err, "cannot establish cwd:")
+	}
+	// log.Println("cwd:", cwd)
+	configDir := fmt.Sprintf("%s/config", cwd)
+
+	return configDir, nil
+}
+
+//
+// checks if a config file can be found in the expected path
 //
 func configExists() bool {
 
