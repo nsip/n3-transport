@@ -26,8 +26,9 @@ func main() {
 	}
 	defer n3pub.Close()
 
-	namespace := "EjonwQe6SD2BrWeMz69q4RNnZxAZFmGsA3cNAXTLHdPz" // from config in real world
-	contextName := "mfcontext"
+	// namespace := "EjonwQe6SD2BrWeMz69q4RNnZxAZFmGsA3cNAXTLHdPz" // from config in real world
+	namespace := "Kq4x2R772xNytscwNV6YSRgbA38tDCUL1zvLS51paUU" // from config in real world
+	contextName := "mfcontext2"
 
 	tuple, err := messages.NewTuple("subject1", "predicate1longlonglonglonglonglonglonglong", "obj1")
 

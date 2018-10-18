@@ -42,7 +42,7 @@ func NewNode() (*N3Node, error) {
 
 	err := checkConfig()
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "ensure you have run 'n3cli init'")
 	}
 
 	// get the b58 string of the public key
