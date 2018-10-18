@@ -7,3 +7,4 @@ app/dispatcher/dispatcher
 app/node/n3cli
 app/node/node
 app/test/n3pub/n3pub
+app/n3cli/n3cli
