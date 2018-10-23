@@ -307,6 +307,11 @@ func (n3c *N3Node) startReadHandler() error {
 	log.Println("consming messages offset from:", nextMessage)
 	handler := func(msg *lbproto.Message, err error) {
 
+		if err != nil {
+			log.Println("read handler error from liftbridge server:", err)
+			return
+		}
+
 		// decode msg from transport format
 		n3msg, err := messages.DecodeN3Message(msg.Value)
 		if err != nil {
