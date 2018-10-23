@@ -14,11 +14,18 @@ import (
 // test harness example of creating a publisher to talk to the
 // grpc endpoint on an n3 node
 //
+//
 func main() {
 
 	numMessages := flag.Int("n", 1000, "number of messages to publish")
+	nameSpace := flag.String("namespace", "", "namespace id for the context to publish to")
+	contextName := flag.String("context", "", "context name to publish to")
 
 	flag.Parse()
+
+	if *contextName == "" || *nameSpace == "" {
+		log.Fatalln("must provide namespace and context name")
+	}
 
 	n3pub, err := n3grpc.NewPublisher("localhost", 5777)
 	if err != nil {
@@ -26,15 +33,11 @@ func main() {
 	}
 	defer n3pub.Close()
 
-	// namespace := "EjonwQe6SD2BrWeMz69q4RNnZxAZFmGsA3cNAXTLHdPz" // from config in real world
-	namespace := "Kq4x2R772xNytscwNV6YSRgbA38tDCUL1zvLS51paUU" // from config in real world
-	contextName := "mfcontext2"
-
 	tuple, err := messages.NewTuple("subject1", "predicate1longlonglonglonglonglonglonglong", "obj1")
 
 	for i := 0; i < *numMessages; i++ {
 		tuple.Version = int64(i)
-		err = n3pub.Publish(tuple, namespace, contextName)
+		err = n3pub.Publish(tuple, *nameSpace, *contextName)
 		if err != nil {
 			log.Fatalln("publish error:", err)
 		}
