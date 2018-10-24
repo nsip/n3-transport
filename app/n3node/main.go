@@ -25,7 +25,7 @@ var n3n n3node.N3Node
 //
 func main() {
 
-	runServices := flag.Bool("withServices", true, "launches all background services (gnats, liftbridge, influx, dispatcher) set to false if only running as a consumer node.")
+	runServices := flag.Bool("withServices", true, "launches node and all background services (gnats, liftbridge, influx, dispatcher) set to false if only running as a consumer node.")
 	servicesOnly := flag.Bool("servicesOnly", false, "launches just background services (gnats, liftbridge, influx, dispatcher).")
 
 	flag.Parse()

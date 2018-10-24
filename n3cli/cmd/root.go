@@ -28,9 +28,6 @@ var rootCmd = &cobra.Command{
 	Use:   "n3cli",
 	Short: "N3 Commnad Line Interface Tool",
 	Long:  `Allows user interaction with an n3 installation`,
-	// Uncomment the following line if your bare application
-	// has an action associated with it:
-	//	Run: func(cmd *cobra.Command, args []string) { },
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
