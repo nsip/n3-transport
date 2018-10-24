@@ -1,4 +1,4 @@
-// Copyright © 2018 NAME HERE <EMAIL ADDRESS>
+// Copyright © 2018  <EMAIL ADDRESS>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -25,9 +25,13 @@ import (
 var initCmd = &cobra.Command{
 	Use:   "init",
 	Short: "initialises an N3 node",
-	Long: `Creates local user identity for service interactions and sets default server/port
+	Long: `
+
+	Creates local user identity for service interactions and sets default server/port
 	connection details for nats, liftbridge, grpc etc. servers.
+	
 	All details are stored in [current working directory]/config/n3config.toml
+	
 	`,
 	Run: func(cmd *cobra.Command, args []string) {
 		// fmt.Println("init called")
@@ -49,5 +53,13 @@ func createNodeIdentity(args []string) {
 	if err != nil {
 		log.Fatalln("init failed, cannot create base config:", err)
 	}
+
+	log.Printf(`
+		
+		Init succeeded.
+		Node Identity successfully created.
+
+		Use config file shown above to change server settings for nats, liftbridge, influx etc.
+		`)
 
 }

@@ -29,10 +29,18 @@ import (
 // approveCmd represents the approve command
 var approveCmd = &cobra.Command{
 	Use:   "approve user(required) contextName(required)",
-	Short: "Approve a user for access to a context",
-	Long: `Approve a user to receive messages for a context.
-	arguments are userid contextname:
-	>approve userid context`,
+	Short: "Approve a user for participation in a context",
+	Long: `
+	Approve a user to participate in a context. Requires arguments:
+	user - public-key id of user
+	context-name - the name of the context
+
+	for example,
+
+	>./n3cli approve 78CaH3sHwsLHVo5ov6VHPuFRqeiuDsxuhM7spUtB3cEU nsipContext1
+
+	you are only able to approve users for contexts that you own.
+	`,
 	Args: cobra.MinimumNArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
 		// fmt.Println("approve called")
@@ -49,7 +57,7 @@ func sendApproval(args []string) {
 	// read the config
 	err := n3config.ReadConfig()
 	if err != nil {
-		log.Fatalln("cannot proceed, no config found - run 'n3cli init' to create one")
+		log.Fatalf("\n\n\tcannot proceed, no valid n3 config found \n\t- run './n3cli init' to create one\n\n")
 	}
 
 	// check the user
@@ -100,6 +108,6 @@ func sendApproval(args []string) {
 		return
 	}
 
-	log.Println("approval published.")
+	log.Printf("\n\n\tContext created: %s \n\tContext approval for user (%s) published to n3 network.\n\n", contextName, user)
 
 }

@@ -26,7 +26,8 @@ import (
 var createCmd = &cobra.Command{
 	Use:   "create context-name(required)",
 	Short: "establishes a new data context on the messaging servers",
-	Long: `Contexts are namespaces for managing user access and collaboration
+	Long: `
+	Contexts are namespaces for managing user access and collaboration
 	on a dataset. Create a context and approve users to read and write data
 	within that context.
 	Contexts also allow context-wide and user privacy restrictions.
@@ -58,7 +59,7 @@ func createNewContext(contextName string) {
 	// read the config
 	err := n3config.ReadConfig()
 	if err != nil {
-		log.Fatalln("cannot proceed, no config found - run 'n3cli init' to create one")
+		log.Fatalf("\n\n\tcannot proceed, no valid n3 config found \n\t- run './n3cli init' to create one\n\n")
 	}
 
 	// id of this user
