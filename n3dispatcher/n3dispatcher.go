@@ -200,7 +200,7 @@ func (disp *Dispatcher) startApprovalHandler() error {
 
 	// create the subscription and run until context is cancelled
 	go func() {
-		err := disp.lbConn.Subscribe(ctx, "approvals", "approvals-stream", handler)
+		err := disp.lbConn.Subscribe(ctx, "approvals", "approvals-stream", handler, liftbridge.StartAtEarliestReceived())
 		if err != nil {
 			log.Println("error subscribing approvals handler: ", err)
 			disp.removeHandlerContext("approvals")

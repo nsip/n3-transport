@@ -181,7 +181,7 @@ func (n3c *N3Node) startApprovalHandler() error {
 
 	// create the subscription and run until context is cancelled
 	go func() {
-		err := n3c.lbConn.Subscribe(ctx, "approvals", "approvals-stream", handler)
+		err := n3c.lbConn.Subscribe(ctx, "approvals", "approvals-stream", handler, liftbridge.StartAtEarliestReceived())
 		if err != nil {
 			log.Println("node error subscribing approvals handler: ", err)
 			n3c.removeHandlerContext("approvals")
