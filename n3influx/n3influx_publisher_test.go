@@ -8,9 +8,9 @@ import (
 )
 
 func TestStoreTuple(t *testing.T) {
-	defer func() { uPH(recover(), "./log.txt", true) }()
+	defer func() { PH(recover(), "./log.txt", true) }()
 	dbClient, e := NewPublisher()
-	uPE(e)
+	PE(e)
 
 	tuple := &pb.SPOTuple{
 		Subject:   "D3E34F41-9D75-101A-8C3D-00AA001A1652",
@@ -18,7 +18,7 @@ func TestStoreTuple(t *testing.T) {
 		Object:    "0123A111",
 	}
 	e = dbClient.StoreTuple(tuple, "temp")
-	uPE(e)
+	PE(e)
 
 	time.Sleep(2 * time.Second)
 }
