@@ -17,7 +17,7 @@ package cmd
 import (
 	"log"
 
-	"github.com/nsip/n3-transport/n3config"
+	"../../n3config"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )

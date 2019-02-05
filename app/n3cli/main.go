@@ -14,7 +14,9 @@
 
 package main
 
-import "github.com/nsip/n3-transport/n3cli/cmd"
+import (
+	"../../n3cli/cmd"
+)
 
 func main() {
 	cmd.Execute()

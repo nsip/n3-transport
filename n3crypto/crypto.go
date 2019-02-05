@@ -7,8 +7,8 @@ import (
 
 	"github.com/kevinburke/nacl"
 	"github.com/kevinburke/nacl/box"
-	"github.com/nsip/n3-transport/messages"
-	"github.com/nsip/n3-transport/messages/pb"
+	"github.com/nsip/n3-messages/messages"
+	"github.com/nsip/n3-messages/messages/pb"
 	"github.com/shengdoushi/base58"
 )
 

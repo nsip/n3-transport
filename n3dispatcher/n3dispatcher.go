@@ -8,12 +8,12 @@ import (
 	"log"
 	"sync"
 
+	"../n3config"
+	"../n3liftbridge"
 	liftbridge "github.com/liftbridge-io/go-liftbridge"
 	lbproto "github.com/liftbridge-io/go-liftbridge/liftbridge-grpc"
 	nats "github.com/nats-io/go-nats"
-	"github.com/nsip/n3-transport/messages"
-	"github.com/nsip/n3-transport/n3config"
-	"github.com/nsip/n3-transport/n3liftbridge"
+	"github.com/nsip/n3-messages/messages"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 )

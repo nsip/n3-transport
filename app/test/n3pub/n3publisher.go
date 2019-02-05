@@ -6,8 +6,8 @@ import (
 	"flag"
 	"log"
 
-	"github.com/nsip/n3-transport/messages"
-	"github.com/nsip/n3-transport/n3grpc"
+	"github.com/nsip/n3-messages/messages"
+	"github.com/nsip/n3-messages/n3grpc"
 )
 
 //

@@ -7,19 +7,19 @@ import (
 	"log"
 	"time"
 
-	influx "github.com/influxdata/influxdb/client/v2"
-	"github.com/nsip/n3-transport/messages/pb"
+	influx "github.com/influxdata/influxdb1-client/v2"
+	"github.com/nsip/n3-messages/messages/pb"
 	"github.com/spf13/viper"
 )
 
-type Publisher struct {
+type DBClient struct {
 	cl influx.Client
 	ch chan *influx.Point
 }
 
-func NewPublisher() (*Publisher, error) {
+func NewPublisher() (*DBClient, error) {
 
-	n3ic := &Publisher{
+	n3ic := &DBClient{
 		ch: make(chan *influx.Point),
 	}
 
@@ -33,7 +33,7 @@ func NewPublisher() (*Publisher, error) {
 	return n3ic, nil
 }
 
-func (n3ic *Publisher) Query(q influx.Query) (*influx.Response, error) {
+func (n3ic *DBClient) Query(q influx.Query) (*influx.Response, error) {
 	return n3ic.cl.Query(q)
 }
 
@@ -65,7 +65,7 @@ func influxClient() (influx.Client, error) {
 // influx when a batch size has been reached or a timing threshold
 // is passed
 //
-func (n3ic *Publisher) startStorageHandler() {
+func (n3ic *DBClient) startStorageHandler() {
 
 	var coll []*influx.Point
 	batchInterval := time.Duration(time.Millisecond * 500)
@@ -112,7 +112,7 @@ func (n3ic *Publisher) startStorageHandler() {
 //
 // send the tuple to influx, passes into batching storage handler
 //
-func (n3ic *Publisher) StoreTuple(tuple *pb.SPOTuple, contextName string) error {
+func (n3ic *DBClient) StoreTuple(tuple *pb.SPOTuple, contextName string) error {
 	// don't publish empty objects (deletion markers): we have tombstoning for that
 	if len(tuple.Object) == 0 {
 		return nil
@@ -142,7 +142,7 @@ func (n3ic *Publisher) StoreTuple(tuple *pb.SPOTuple, contextName string) error 
 }
 
 // "delete" the tuple: tuple is stored but tombstoned
-func (n3ic *Publisher) DeleteTuple(tuple *pb.SPOTuple, contextName string) error {
+func (n3ic *DBClient) DeleteTuple(tuple *pb.SPOTuple, contextName string) error {
 
 	// extract data from tuple and use to construct point
 	tags := map[string]string{

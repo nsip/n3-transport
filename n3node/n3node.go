@@ -7,20 +7,24 @@ import (
 	"fmt"
 	"log"
 	"sync"
+	"time"
 
+	"../n3config"
+	"../n3crypto"
+	"../n3influx"
+	"../n3liftbridge"
+	"../n3nats"
+	"github.com/google/uuid"
 	liftbridge "github.com/liftbridge-io/go-liftbridge"
 	lbproto "github.com/liftbridge-io/go-liftbridge/liftbridge-grpc"
 	nats "github.com/nats-io/go-nats"
-	"github.com/nsip/n3-transport/messages"
-	"github.com/nsip/n3-transport/messages/pb"
-	"github.com/nsip/n3-transport/n3config"
-	"github.com/nsip/n3-transport/n3crypto"
-	"github.com/nsip/n3-transport/n3grpc"
-	"github.com/nsip/n3-transport/n3influx"
-	"github.com/nsip/n3-transport/n3liftbridge"
-	"github.com/nsip/n3-transport/n3nats"
+	"github.com/nsip/n3-messages/messages"
+	"github.com/nsip/n3-messages/messages/pb"
+	"github.com/nsip/n3-messages/n3grpc"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
+
+	u "github.com/cdutwhu/go-util"
 )
 
 //
@@ -198,6 +202,9 @@ func (n3c *N3Node) startApprovalHandler() error {
 //
 func (n3c *N3Node) startWriteHandler() error {
 
+	// get an instance of direct db query
+	dbClient, _ := n3influx.NewPublisher()
+
 	// join network, acquire dispatcher
 	dispatcherid, err := n3nats.Join(n3c.natsConn, n3c.pubKey)
 	if err != nil {
@@ -227,6 +234,9 @@ func (n3c *N3Node) startWriteHandler() error {
 		// TODO: check privacy rules
 
 		// TODO: assign lamport clock version
+		if !assignVer(dbClient, tuple, n3msg.CtxName) {
+			return
+		}
 
 		// specify dispatcher
 		// n3msg.DispId = dispatcherid
@@ -258,14 +268,68 @@ func (n3c *N3Node) startWriteHandler() error {
 			log.Println("write handler unable to publish message: ", err)
 			return
 		}
+	}
 
+	// *** set up handler for query by inbound messages ***
+	qHandler := func(n3msg *pb.N3Message) (ts []*pb.SPOTuple) {
+		fPln("in Query qHandler")
+		tuple := Must(messages.DecodeTuple(n3msg.Payload)).(*pb.SPOTuple)
+		s := tuple.Subject
+		start, end, _ := getValueVerRange(dbClient, s, n3msg.CtxName)
+
+		if sHS(n3msg.CtxName, "-sif") {
+
+			tempCtx := fSf("temp_%d", time.Now().UnixNano())
+			n := dbClient.BatTrans(tuple, n3msg.CtxName, tempCtx, false, true, start, end)
+			fPln("v", n)
+
+			tupleS := &pb.SPOTuple{Subject: tuple.Predicate, Predicate: "::"}
+			n = dbClient.BatTrans(tupleS, n3msg.CtxName, tempCtx, true, false, 0, 0)
+			fPln("s", n)
+
+			tupleA := &pb.SPOTuple{Subject: tuple.Predicate, Predicate: tuple.Subject}
+			n = dbClient.BatTrans(tupleA, n3msg.CtxName, tempCtx, true, false, 0, 0)
+			fPln("a", n)
+
+			/******************************************/
+			arrInfo := make(map[string]int) /* key: predicate, value: array count */
+			// ctx, revArr := n3msg.CtxName, true /* Search from original measurement, reverse array order */
+			// dbClient.QueryTuple(tuple, 0, revArr, ctx, &ts, &arrInfo, start, end) /* Search from original measurement */
+			ctx, revArr := tempCtx, true                                    /* Search from temp measurement, reverse array order */
+			dbClient.QueryTuple(tuple, 0, revArr, ctx, &ts, &arrInfo, 0, 0) /* Search from temp measurement */
+			dbClient.AdjustOptionalTuples(&ts, &arrInfo)                    /* we need re-order some tuples */
+
+			/******************************************/
+			dbClient.DropCtx(tempCtx)
+
+		} else if sHS(n3msg.CtxName, "-xapi") {
+			dbClient.QueryTuples(tuple, n3msg.CtxName, &ts, start, end)
+		} else if sHS(n3msg.CtxName, "-meta") { // *** request a ticket for publishing
+
+		AGAIN:
+			if _, ok := mapTickets.Load(s); ok {
+				time.Sleep(time.Millisecond * DELAY_CONTEST)
+				goto AGAIN
+			}
+
+			_, ve, v := getValueVerRange(dbClient, tuple.Subject, n3msg.CtxName)
+			termID, endV := uuid.New().String(), u.I64(ve).ToStr()
+			ts = append(ts, &pb.SPOTuple{Subject: s, Predicate: termID, Object: endV, Version: v}) // *** return result ***
+
+			mapTickets.Store(s, &ticket{tktID: termID, idx: endV})
+
+			if flagRmTicket {
+				go ticketRmAsync(dbClient, &mapTickets, n3msg.CtxName)
+				flagRmTicket = false
+			}
+		}
+		return
 	}
 
 	// start server
 	apiServer := n3grpc.NewAPIServer()
-	apiServer.SetMessageHandler(handler)
+	apiServer.SetMessageHandler(handler, qHandler)
 	return apiServer.Start(viper.GetInt("rpc_port"))
-
 }
 
 //
@@ -324,6 +388,11 @@ func (n3c *N3Node) startReadHandler() error {
 		tuple, err := n3crypto.DecryptTuple(n3msg.Payload, n3msg.DispId, n3c.privKey)
 		if err != nil {
 			log.Println("read handler decrypt error: ", err)
+			return
+		}
+
+		// *** exclude "legend liftbridge data" ***
+		if inDB(pub, tuple, n3msg.CtxName) {
 			return
 		}
 

@@ -7,10 +7,10 @@ import (
 	"fmt"
 	"log"
 
+	"../n3crypto"
 	lbproto "github.com/liftbridge-io/go-liftbridge/liftbridge-grpc"
-	"github.com/nsip/n3-transport/messages"
-	"github.com/nsip/n3-transport/messages/pb"
-	"github.com/nsip/n3-transport/n3crypto"
+	"github.com/nsip/n3-messages/messages"
+	"github.com/nsip/n3-messages/messages/pb"
 )
 
 type workerConfig struct {

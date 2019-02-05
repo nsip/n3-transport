@@ -5,8 +5,8 @@ package main
 import (
 	"log"
 
-	cmn "github.com/nsip/n3-transport/common"
-	"github.com/nsip/n3-transport/n3dispatcher"
+	cmn "../../common"
+	"../../n3dispatcher"
 )
 
 //
