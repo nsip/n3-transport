@@ -17,7 +17,7 @@ type DBClient struct {
 	ch chan *influx.Point
 }
 
-func NewPublisher() (*DBClient, error) {
+func NewDBClient() (*DBClient, error) {
 
 	n3ic := &DBClient{
 		ch: make(chan *influx.Point),
@@ -124,6 +124,38 @@ func (n3ic *DBClient) StoreTuple(tuple *pb.SPOTuple, contextName string) error {
 		"predicate": tuple.Predicate,
 		"object":    tuple.Object,
 		"tombstone": "false",
+	}
+	fields := map[string]interface{}{
+		"version": tuple.Version,
+		// "predicate": tuple.Predicate,
+		// "object":    tuple.Object,
+	}
+
+	pt, err := influx.NewPoint(contextName, tags, fields, time.Now())
+	if err != nil {
+		return err
+	}
+
+	n3ic.ch <- pt
+
+	return nil
+}
+
+//
+// send the tuple to influx, passes into batching storage handler
+//
+func (n3ic *DBClient) KillTuple(tuple *pb.SPOTuple, contextName string) error {
+	// don't publish empty objects (deletion markers): we have tombstoning for that
+	if len(tuple.Object) == 0 {
+		return nil
+	}
+
+	// extract data from tuple and use to construct point
+	tags := map[string]string{
+		"subject":   tuple.Subject,
+		"predicate": tuple.Predicate,
+		"object":    tuple.Object,
+		"tombstone": "true",
 	}
 	fields := map[string]interface{}{
 		"version": tuple.Version,

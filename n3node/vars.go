@@ -30,9 +30,7 @@ var (
 	verMeta       int64 = 1
 	mapIDVQueue         = make(map[string][]int64)
 	mapVerInDBChk       = make(map[string]int64)
-	mapVerToMeta        = syncmap.Map{}
-	mapTickets          = syncmap.Map{} //make(map[string]*sendRec)
-	flagRmTicket        = true
+	mapTickets          = syncmap.Map{}
 )
 
 type (
@@ -50,7 +48,8 @@ type (
 )
 
 const (
+	DEADMARK      = "TOMBSTONE"
 	TERMMARK      = "ENDENDEND"
 	DELAY_CONTEST = 500
-	DELAY_CHKTERM = 100
+	DELAY_CHKTERM = 30
 )

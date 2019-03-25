@@ -18,7 +18,9 @@ var (
 	fSf  = fmt.Sprintf
 	fPln = fmt.Println
 
-	sI = strings.Index
+	sI   = strings.Index
+	sC   = strings.Contains
+	sSpl = strings.Split
 )
 
 const (

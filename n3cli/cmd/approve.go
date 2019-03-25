@@ -34,17 +34,14 @@ var approveCmd = &cobra.Command{
 	Approve a user to participate in a context. Requires arguments:
 	user - public-key id of user
 	context-name - the name of the context
-
 	for example,
-
 	>./n3cli approve 78CaH3sHwsLHVo5ov6VHPuFRqeiuDsxuhM7spUtB3cEU nsipContext1
-
 	you are only able to approve users for contexts that you own.
 	`,
 	Args: cobra.MinimumNArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
 		// fmt.Println("approve called")
-		sendApproval(args)
+		sendApprovals(args)
 	},
 }
 
@@ -52,7 +49,13 @@ func init() {
 	rootCmd.AddCommand(approveCmd)
 }
 
-func sendApproval(args []string) {
+//
+// makes the context available to the remote user
+// by publishing an approval for the base context
+// and the context-meta which holds useful
+// strucutral information about the context.
+//
+func sendApprovals(args []string) {
 
 	// read the config
 	err := n3config.ReadConfig()
@@ -60,9 +63,10 @@ func sendApproval(args []string) {
 		log.Fatalf("\n\n\tcannot proceed, no valid n3 config found \n\t- run './n3cli init' to create one\n\n")
 	}
 
-	// check the user
+	// check the user & context
 	user := strings.TrimSpace(args[0])
 	contextName := strings.TrimSpace(args[1])
+	contextNameMeta := contextName + "-meta"
 	if user == "" || contextName == "" {
 		log.Println("cannot have empty arguments")
 		return
@@ -78,11 +82,27 @@ func sendApproval(args []string) {
 	}
 	// log.Printf("%v\n", approvalTuple)
 
+	approvalTupleMeta := &pb.SPOTuple{Subject: user, Predicate: "grant", Object: contextNameMeta}
+	tupleBytesMeta, err := messages.EncodeTuple(approvalTupleMeta)
+	if err != nil {
+		log.Println("unable to encode approval meta tuple: ", err)
+		return
+	}
+
 	// fetch required identity keys
 	mypubKey := viper.GetString("pubkey")
 
+	// context message
 	approvalMsg := &pb.N3Message{
 		Payload:   tupleBytes,
+		SndId:     mypubKey,
+		NameSpace: mypubKey,
+		CtxName:   "approvals",
+	}
+
+	// context-meta message
+	approvalMsgMeta := &pb.N3Message{
+		Payload:   tupleBytesMeta,
 		SndId:     mypubKey,
 		NameSpace: mypubKey,
 		CtxName:   "approvals",
@@ -91,6 +111,11 @@ func sendApproval(args []string) {
 	approvalBytes, err := messages.EncodeN3Message(approvalMsg)
 	if err != nil {
 		log.Println("unable to encode approval message: ", err)
+	}
+
+	approvalBytesMeta, err := messages.EncodeN3Message(approvalMsgMeta)
+	if err != nil {
+		log.Println("unable to encode approval -meta message: ", err)
 	}
 
 	// send to approve
@@ -108,6 +133,12 @@ func sendApproval(args []string) {
 		return
 	}
 
-	log.Printf("\n\n\tContext created: %s \n\tContext approval for user (%s) published to n3 network.\n\n", contextName, user)
+	err = nc.Publish("approvals", approvalBytesMeta)
+	if err != nil {
+		log.Println("unable to publish approval -meta message: ", err)
+		return
+	}
+
+	log.Printf("\n\n\tContexts created: \n\t %s \n\t %s \n\tContext approvals for user (%s) published to n3 network.\n\n", contextName, contextNameMeta, user)
 
 }

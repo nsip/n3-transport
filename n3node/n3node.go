@@ -7,14 +7,12 @@ import (
 	"fmt"
 	"log"
 	"sync"
-	"time"
 
 	"../n3config"
 	"../n3crypto"
 	"../n3influx"
 	"../n3liftbridge"
 	"../n3nats"
-	"github.com/google/uuid"
 	liftbridge "github.com/liftbridge-io/go-liftbridge"
 	lbproto "github.com/liftbridge-io/go-liftbridge/liftbridge-grpc"
 	nats "github.com/nats-io/go-nats"
@@ -203,7 +201,7 @@ func (n3c *N3Node) startApprovalHandler() error {
 func (n3c *N3Node) startWriteHandler() error {
 
 	// get an instance of direct db query
-	dbClient, _ := n3influx.NewPublisher()
+	dbClient, _ := n3influx.NewDBClient()
 
 	// join network, acquire dispatcher
 	dispatcherid, err := n3nats.Join(n3c.natsConn, n3c.pubKey)
@@ -233,102 +231,156 @@ func (n3c *N3Node) startWriteHandler() error {
 
 		// TODO: check privacy rules
 
-		// TODO: assign lamport clock version
-		if !assignVer(dbClient, tuple, n3msg.CtxName) {
-			return
+		// TODO: *** assign lamport clock version ***
+		tupleQueue, ctxQueue := []*pb.SPOTuple{tuple}, []string{n3msg.CtxName}
+
+		if tuple.Predicate == DEADMARK { //           *** Delete this object ***
+
+			tupleMeta := &pb.SPOTuple{Subject: tuple.Subject, Predicate: "V"}
+			ctxMeta := u.Str(n3msg.CtxName).MkSuffix("-meta").V()
+			obj, v := dbClient.GetObjVer(tupleMeta, ctxMeta)
+			if obj == "0-0" { //                      *** if the last meta tuple is delete symbol, do nothing ***
+				return
+			}
+			verMeta = u.TerOp(v == -1, int64(1), v+1).(int64)
+			tupleQueue[0] = &pb.SPOTuple{Subject: tuple.Subject, Predicate: "V", Object: "0-0", Version: verMeta}
+			ctxQueue[0] = ctxMeta
+
+		} else {
+
+			if goon, metaTuple, metaCtx := assignVer(dbClient, tuple, n3msg.CtxName, " + "); !goon {
+				return
+			} else if metaTuple != nil { //           *** Save prevID's low-high version map into meta db as <"id" "V" "low-high"> ***
+				tupleQueue, ctxQueue = append(tupleQueue, metaTuple), append(ctxQueue, metaCtx)
+				// fPln("--->meta db:", metaTuple, metaCtx) //  *** DEBUG ***
+			}
+
 		}
 
-		// specify dispatcher
-		// n3msg.DispId = dispatcherid
+		for i := 0; i < len(tupleQueue); i++ {
 
-		// encrypt tuple payload for dispatcher
-		encryptedTuple, err := n3crypto.EncryptTuple(tuple, dispatcherid, n3c.privKey)
-		if err != nil {
-			log.Println("write handler unable to encrypt tuple: ", err)
-			return
-		}
+			// specify dispatcher
+			// n3msg.DispId = dispatcherid
 
-		newMsg := &pb.N3Message{
-			Payload:   encryptedTuple,
-			SndId:     n3c.pubKey,
-			NameSpace: n3msg.NameSpace,
-			CtxName:   n3msg.CtxName,
-			DispId:    dispatcherid,
-		}
+			// encrypt tuple payload for dispatcher
+			encryptedTuple, err := n3crypto.EncryptTuple(tupleQueue[i], dispatcherid, n3c.privKey)
+			if err != nil {
+				log.Println("write handler unable to encrypt tuple: ", err)
+				return
+			}
 
-		// encode & send
-		msgBytes, err := messages.EncodeN3Message(newMsg)
-		if err != nil {
-			log.Println("write handler unable to encode message: ", err)
-			return
-		}
+			newMsg := &pb.N3Message{
+				Payload:   encryptedTuple,
+				SndId:     n3c.pubKey,
+				NameSpace: n3msg.NameSpace,
+				CtxName:   ctxQueue[i],
+				DispId:    dispatcherid,
+			}
 
-		err = n3c.natsConn.Publish(dispatcherid, msgBytes)
-		if err != nil {
-			log.Println("write handler unable to publish message: ", err)
-			return
+			// encode & send
+			msgBytes, err := messages.EncodeN3Message(newMsg)
+			if err != nil {
+				log.Println("write handler unable to encode message: ", err)
+				return
+			}
+
+			err = n3c.natsConn.Publish(dispatcherid, msgBytes)
+			if err != nil {
+				log.Println("write handler unable to publish message: ", err)
+				return
+			}
 		}
 	}
 
 	// *** set up handler for query by inbound messages ***
 	qHandler := func(n3msg *pb.N3Message) (ts []*pb.SPOTuple) {
-		fPln("in Query qHandler")
+
+		const pathDel, childDel = " ~ ", " + "
 		tuple := Must(messages.DecodeTuple(n3msg.Payload)).(*pb.SPOTuple)
-		s := tuple.Subject
-		start, end, _ := getValueVerRange(dbClient, s, n3msg.CtxName)
+		s, p, o, ctx := tuple.Subject, tuple.Predicate, tuple.Object, n3msg.CtxName
 
-		if sHS(n3msg.CtxName, "-sif") {
+		fPf("Query : <%s> <%s> <%s> <%s>\n", s, p, o, ctx)
 
-			tempCtx := fSf("temp_%d", time.Now().UnixNano())
-			n := dbClient.BatTrans(tuple, n3msg.CtxName, tempCtx, false, true, start, end)
-			fPln("v", n)
+		if s == "" && p != "" && o != "" { //                                              *** subject ID query ***
 
-			tupleS := &pb.SPOTuple{Subject: tuple.Predicate, Predicate: "::"}
-			n = dbClient.BatTrans(tupleS, n3msg.CtxName, tempCtx, true, false, 0, 0)
-			fPln("s", n)
-
-			tupleA := &pb.SPOTuple{Subject: tuple.Predicate, Predicate: tuple.Subject}
-			n = dbClient.BatTrans(tupleA, n3msg.CtxName, tempCtx, true, false, 0, 0)
-			fPln("a", n)
-
-			/******************************************/
-			arrInfo := make(map[string]int) /* key: predicate, value: array count */
-			// ctx, revArr := n3msg.CtxName, true /* Search from original measurement, reverse array order */
-			// dbClient.QueryTuple(tuple, 0, revArr, ctx, &ts, &arrInfo, start, end) /* Search from original measurement */
-			ctx, revArr := tempCtx, true                                    /* Search from temp measurement, reverse array order */
-			dbClient.QueryTuple(tuple, 0, revArr, ctx, &ts, &arrInfo, 0, 0) /* Search from temp measurement */
-			dbClient.AdjustOptionalTuples(&ts, &arrInfo)                    /* we need re-order some tuples */
-
-			/******************************************/
-			dbClient.DropCtx(tempCtx)
-
-		} else if sHS(n3msg.CtxName, "-xapi") {
-			dbClient.QueryTuples(tuple, n3msg.CtxName, &ts, start, end)
-		} else if sHS(n3msg.CtxName, "-meta") { // *** request a ticket for publishing
-
-		AGAIN:
-			if _, ok := mapTickets.Load(s); ok {
-				time.Sleep(time.Millisecond * DELAY_CONTEST)
-				goto AGAIN
+			ids := dbClient.IDListByPathValue(tuple, ctx)
+			for _, id := range ids {
+				ts = append(ts, &pb.SPOTuple{Subject: id, Predicate: p, Object: o})
 			}
-
-			_, ve, v := getValueVerRange(dbClient, tuple.Subject, n3msg.CtxName)
-			termID, endV := uuid.New().String(), u.I64(ve).ToStr()
-			ts = append(ts, &pb.SPOTuple{Subject: s, Predicate: termID, Object: endV, Version: v}) // *** return result ***
-
-			mapTickets.Store(s, &ticket{tktID: termID, idx: endV})
-
-			if flagRmTicket {
-				go ticketRmAsync(dbClient, &mapTickets, n3msg.CtxName)
-				flagRmTicket = false
-			}
+			return
 		}
+
+		if p != "::" { //                                                                   *** values query ***
+
+			if p == "" { //                                                                 *** root query ***
+
+				root := dbClient.RootByID(s, ctx, pathDel)
+				ts = append(ts, &pb.SPOTuple{Subject: s, Predicate: "root", Object: root})
+
+			} else if p == "[]" { //                                                        *** array info query ***
+
+				root := dbClient.RootByID(s, ctx, pathDel)
+				if ss, _, os, vs, ok := dbClient.GetObjs(&pb.SPOTuple{Subject: root, Predicate: s}, ctx, true, false, 0, 0); ok {
+					for i := range ss {
+						ts = append(ts, &pb.SPOTuple{Subject: s, Predicate: ss[i], Object: os[i], Version: vs[i]})
+					}
+				}
+
+				// fPln("A ------>", root, len(ts)) // *** DEBUG
+
+			} else { //  p == PATH                                                          *** values query ***
+
+				// fPln("<here values query 1>", s, p, ctx)
+
+				if alive, start, end, v := getValueVerRange(dbClient, s, ctx); alive { //   *** Meta file to check ***
+					if !sHS(ctx, "-meta") {
+						dbClient.QueryTuples(tuple, ctx, &ts, start, end)
+					} else {
+						return requestTicket(dbClient, ctx, s, end, v) //                   *** request a ticket for publishing ***
+					}
+
+					// *** we do NOT use different queries ***
+					// if sHS(ctx, "-sif") {
+					// 	// fPln("<here values query sif 2>", s, p, ctx)
+					// 	return queryHandle(dbClient, tuple, ctx, pathDel, childDel, start, end)
+					// } else if sHS(ctx, "-xapi") {
+					// 	// fPln("<here values query xapi 3>", s, p, ctx)
+					// 	dbClient.QueryTuples(tuple, ctx, &ts, start, end)
+					// } else if sHS(ctx, "-meta") { //                                      *** request a ticket for publishing ***
+					// 	// fPln("<here values query meta 4>", s, p, ctx)
+					// 	return requestTicket(dbClient, ctx, s, end, v)
+					// }
+				}
+
+			}
+
+		} else { //  p == "::"                                                                *** struct query ***
+
+			root := sSpl(s, pathDel)[0]
+			tuple := &pb.SPOTuple{Subject: root, Predicate: "::"}
+			if ss, ps, os, vs, ok := dbClient.GetObjs(tuple, ctx, true, false, 0, 0); ok {
+				for i := range ss {
+					ts = append(ts, &pb.SPOTuple{
+						Subject:   ss[i],
+						Predicate: ps[i],
+						Object:    os[i],
+						Version:   vs[i],
+					})
+				}
+			}
+
+		}
+
 		return
+	}
+
+	dHandler := func(n3msg *pb.N3Message) int { //      *** set up handler for delete by inbound messages ***
+		return 1234567 //                               *** DO NOT USE THIS TO DELETE, USE 'DEADMARK' IN PUB ***
 	}
 
 	// start server
 	apiServer := n3grpc.NewAPIServer()
-	apiServer.SetMessageHandler(handler, qHandler)
+	apiServer.SetMessageHandler(handler, qHandler, dHandler)
 	return apiServer.Start(viper.GetInt("rpc_port"))
 }
 
@@ -357,7 +409,7 @@ func (n3c *N3Node) startReadHandler() error {
 	// start up the influx publisher
 	// TODO: abstract multi-db handlers to channel reader
 	// to multiplex send to different data-stores
-	pub, err := n3influx.NewPublisher()
+	pub, err := n3influx.NewDBClient()
 	if err != nil {
 		return errors.Wrap(err, "read handler cannot connect to influx store:")
 	}
