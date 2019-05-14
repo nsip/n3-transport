@@ -35,18 +35,24 @@ import (
 // }
 
 func requestTicket(dbClt *n3influx.DBClient, ctx, sub string, end, v int64) (ts []*pb.SPOTuple) {
-
+	I := 0
 AGAIN:
 	if _, ok := mapTickets.Load(sub); ok {
 		time.Sleep(time.Millisecond * DELAY_CONTEST)
+		I++
+		if I >= 10 {
+			errMsg := "THIS OBJECT OUTSTANDING"
+			ts = append(ts, &pb.SPOTuple{Subject: errMsg, Predicate: errMsg, Object: errMsg, Version: 999})
+			return
+		}
 		goto AGAIN
 	}
 
-	termID, endV := uuid.New().String(), u.I64(end).ToStr()
+	termID, endV := uuid.New().String(), INum2Str(I64(end))
 	ts = append(ts, &pb.SPOTuple{Subject: sub, Predicate: termID, Object: endV, Version: v}) // *** return result ***
 
 	mapTickets.Store(sub, &ticket{tktID: termID, idx: endV})
-	u.GoFn("ticket", 1, false, ticketRmAsync, dbClt, &mapTickets, ctx)
+	u.GoFn("ticket", 1, false, ticketRmAsync, dbClt, &mapTickets, ctx) // *** start infinite loop for deleting ticket ***
 
 	return
 }

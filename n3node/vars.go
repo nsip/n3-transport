@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	u "github.com/cdutwhu/go-util"
+	w "github.com/cdutwhu/go-wrappers"
 	"golang.org/x/sync/syncmap"
 )
 
@@ -14,6 +15,9 @@ var (
 	PH   = u.PanicHandle
 	PC   = u.PanicOnCondition
 	Must = u.Must
+	IF   = u.IF
+
+	INum2Str = w.INum2Str
 
 	fPln = fmt.Println
 	fPf  = fmt.Printf
@@ -45,11 +49,16 @@ type (
 		tktID string
 		idx   string
 	}
+
+	Str = w.Str
+	I64 = w.I64
 )
 
 const (
 	DEADMARK      = "TOMBSTONE"
 	TERMMARK      = "ENDENDEND"
-	DELAY_CONTEST = 500
-	DELAY_CHKTERM = 30
+	DELAY_CONTEST = 2000
+	DELAY_CHKTERM = 5000
+	PATH_DEL      = " ~ "
+	CHILD_DEL     = " + "
 )

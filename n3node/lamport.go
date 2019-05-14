@@ -4,32 +4,31 @@ import (
 	"time"
 
 	"../n3influx"
-	u "github.com/cdutwhu/go-util"
 	"github.com/nsip/n3-messages/messages/pb"
 	"golang.org/x/sync/syncmap"
 )
 
 func getValueVerRange(dbClient *n3influx.DBClient, objID string, ctx string) (alive bool, start, end, ver int64) {
 	tuple := &pb.SPOTuple{Subject: objID, Predicate: "V"}
-	o, v := dbClient.GetObjVer(tuple, u.Str(ctx).MkSuffix("-meta").V())
+	o, v := dbClient.GetObjVer(tuple, Str(ctx).MkSuffix("-meta").V())
 	alive = true
 
 	if v != -1 { // *** we can find the objID in meta ***
 		ss := sSpl(o, "-")
-		start, end, ver = u.Str(ss[0]).ToInt64(), u.Str(ss[1]).ToInt64(), v
+		start, end, ver = Str(ss[0]).ToInt64(), Str(ss[1]).ToInt64(), v
 
 		// *** if dead one, reject to assign a new version to this objID ***
-		alive = u.TerOp(start == 0 && end == 0, false, true).(bool)
+		alive = IF(start == 0 && end == 0, false, true).(bool)
 	}
 	return
 }
 
 func mkMetaTuple(dbClient *n3influx.DBClient, ctx, id string, start, end int64) (*pb.SPOTuple, string) {
 
-	ctxMeta := u.Str(ctx).MkSuffix("-meta").V()
+	ctxMeta := Str(ctx).MkSuffix("-meta").V()
 	tuple := &pb.SPOTuple{Subject: id, Predicate: "V"}
 	_, v := dbClient.GetObjVer(tuple, ctxMeta)
-	verMeta = u.TerOp(v == -1, int64(1), v+1).(int64)
+	verMeta = IF(v == -1, int64(1), v+1).(int64)
 
 	return &pb.SPOTuple{
 			Subject:   id,
@@ -43,16 +42,25 @@ func mkMetaTuple(dbClient *n3influx.DBClient, ctx, id string, start, end int64) 
 // ticketRmAsync : args : *n3influx.DBClient, *syncmap.Map, string
 func ticketRmAsync(done <-chan int, id int, args ...interface{}) {
 	dbClient, tkts, ctx := args[0].(*n3influx.DBClient), args[1].(*syncmap.Map), args[2].(string)
-	ctx = u.Str(ctx).RmSuffix("-meta").V()
+	ctx = Str(ctx).RmSuffix("-meta").V()
+	i := 0
 	for {
+		bInRange := false
+		i++
 		tkts.Range(func(k, v interface{}) bool {
+			bInRange = true
 			if o, _ := dbClient.GetObjVer(&pb.SPOTuple{Subject: v.(*ticket).tktID, Predicate: TERMMARK}, ctx); o == k {
-				// fPln(k, "pub done!")
 				tkts.Delete(k)
+			} else {
+				fPf("there is an outstanding@%6d : %s - %s. waiting...\n", i, k, v.(*ticket).tktID)
+				time.Sleep(time.Millisecond * 1000)
 			}
-			return true // *** continue range ***
+			return true //                                                          *** continue range ***
 		})
 		time.Sleep(time.Millisecond * DELAY_CHKTERM)
+		if !bInRange {
+			fPln("pub done !")
+		}
 	}
 	<-done
 }
@@ -64,7 +72,7 @@ func assignVer(dbClient *n3influx.DBClient, tuple *pb.SPOTuple, ctx, childDel st
 	goon = true
 
 	// *** for value tuple ***
-	if u.Str(s).IsUUID() {
+	if Str(s).IsUUID() {
 
 		// *** New ID (NOT Terminator) is coming ***
 		if s != prevID && p != TERMMARK {
@@ -86,7 +94,7 @@ func assignVer(dbClient *n3influx.DBClient, tuple *pb.SPOTuple, ctx, childDel st
 	// *** check struct tuple ***
 	if p == "::" {
 		if objDB, verDB := dbClient.GetObjVer(tuple, ctx); verDB > 0 {
-			if u.Str(objDB).FieldsSeqContain(o, childDel) {
+			if Str(objDB).FieldsSeqCtn(o, childDel) {
 				tuple.Version = 0
 				goon = false
 			}
@@ -107,7 +115,7 @@ func inDB(dbClient *n3influx.DBClient, tuple *pb.SPOTuple, ctx string) bool {
 
 	if _, ok := mapTickets.Load(s); !ok { // *** legend data from liftbridge ***
 
-		if u.Str(s).IsUUID() && p != TERMMARK {
+		if Str(s).IsUUID() && p != TERMMARK {
 			// *** when n3node is restarting, fetch check version from meta data ***
 			alive := true
 			if _, ok := mapVerInDBChk[s]; !ok {
@@ -122,7 +130,7 @@ func inDB(dbClient *n3influx.DBClient, tuple *pb.SPOTuple, ctx string) bool {
 
 	}
 
-	if p == "::" || u.Str(p).IsUUID() || p == TERMMARK {
+	if p == "::" || Str(p).IsUUID() || p == TERMMARK {
 		if objDB, verDB := dbClient.GetObjVer(tuple, ctx); verDB > 0 {
 			if !sHS(ctx, "-meta") { // *** data ***
 				return o == objDB

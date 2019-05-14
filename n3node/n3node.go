@@ -21,8 +21,6 @@ import (
 	"github.com/nsip/n3-messages/n3grpc"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
-
-	u "github.com/cdutwhu/go-util"
 )
 
 //
@@ -237,12 +235,12 @@ func (n3c *N3Node) startWriteHandler() error {
 		if tuple.Predicate == DEADMARK { //           *** Delete this object ***
 
 			tupleMeta := &pb.SPOTuple{Subject: tuple.Subject, Predicate: "V"}
-			ctxMeta := u.Str(n3msg.CtxName).MkSuffix("-meta").V()
+			ctxMeta := Str(n3msg.CtxName).MkSuffix("-meta").V()
 			obj, v := dbClient.GetObjVer(tupleMeta, ctxMeta)
 			if obj == "0-0" { //                      *** if the last meta tuple is delete symbol, do nothing ***
 				return
 			}
-			verMeta = u.TerOp(v == -1, int64(1), v+1).(int64)
+			verMeta = IF(v == -1, int64(1), v+1).(int64)
 			tupleQueue[0] = &pb.SPOTuple{Subject: tuple.Subject, Predicate: "V", Object: "0-0", Version: verMeta}
 			ctxQueue[0] = ctxMeta
 
@@ -295,7 +293,7 @@ func (n3c *N3Node) startWriteHandler() error {
 	// *** set up handler for query by inbound messages ***
 	qHandler := func(n3msg *pb.N3Message) (ts []*pb.SPOTuple) {
 
-		const pathDel, childDel = " ~ ", " + "
+		// const pathDel, childDel = " ~ ", " + "
 		tuple := Must(messages.DecodeTuple(n3msg.Payload)).(*pb.SPOTuple)
 		s, p, o, ctx := tuple.Subject, tuple.Predicate, tuple.Object, n3msg.CtxName
 
@@ -314,15 +312,17 @@ func (n3c *N3Node) startWriteHandler() error {
 
 			if p == "" { //                                                                 *** root query ***
 
-				root := dbClient.RootByID(s, ctx, pathDel)
+				root := dbClient.RootByID(s, ctx, PATH_DEL)
 				ts = append(ts, &pb.SPOTuple{Subject: s, Predicate: "root", Object: root})
 
 			} else if p == "[]" { //                                                        *** array info query ***
-
-				root := dbClient.RootByID(s, ctx, pathDel)
-				if ss, _, os, vs, ok := dbClient.GetObjs(&pb.SPOTuple{Subject: root, Predicate: s}, ctx, true, false, 0, 0); ok {
-					for i := range ss {
-						ts = append(ts, &pb.SPOTuple{Subject: s, Predicate: ss[i], Object: os[i], Version: vs[i]})
+				
+				if alive, _, _, _ := getValueVerRange(dbClient, s, ctx); alive { //         *** Meta file to check ***
+					root := dbClient.RootByID(s, ctx, PATH_DEL)
+					if ss, _, os, vs, ok := dbClient.GetObjs(&pb.SPOTuple{Subject: root, Predicate: s}, ctx, true, false, 0, 0); ok {
+						for i := range ss {
+							ts = append(ts, &pb.SPOTuple{Subject: s, Predicate: ss[i], Object: os[i], Version: vs[i]})
+						}
 					}
 				}
 
@@ -334,7 +334,7 @@ func (n3c *N3Node) startWriteHandler() error {
 
 				if alive, start, end, v := getValueVerRange(dbClient, s, ctx); alive { //   *** Meta file to check ***
 					if !sHS(ctx, "-meta") {
-						dbClient.QueryTuples(tuple, ctx, &ts, start, end)
+						dbClient.QueryTuples(tuple, ctx, &ts, start, end) //                *** general values query ***
 					} else {
 						return requestTicket(dbClient, ctx, s, end, v) //                   *** request a ticket for publishing ***
 					}
@@ -346,7 +346,7 @@ func (n3c *N3Node) startWriteHandler() error {
 					// } else if sHS(ctx, "-xapi") {
 					// 	// fPln("<here values query xapi 3>", s, p, ctx)
 					// 	dbClient.QueryTuples(tuple, ctx, &ts, start, end)
-					// } else if sHS(ctx, "-meta") { //                                      *** request a ticket for publishing ***
+					// } else if sHS(ctx, "-meta") { //                                   *** request a ticket for publishing ***
 					// 	// fPln("<here values query meta 4>", s, p, ctx)
 					// 	return requestTicket(dbClient, ctx, s, end, v)
 					// }
@@ -356,7 +356,7 @@ func (n3c *N3Node) startWriteHandler() error {
 
 		} else { //  p == "::"                                                                *** struct query ***
 
-			root := sSpl(s, pathDel)[0]
+			root := sSpl(s, PATH_DEL)[0]
 			tuple := &pb.SPOTuple{Subject: root, Predicate: "::"}
 			if ss, ps, os, vs, ok := dbClient.GetObjs(tuple, ctx, true, false, 0, 0); ok {
 				for i := range ss {

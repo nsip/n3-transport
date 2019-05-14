@@ -3,14 +3,13 @@ package n3influx
 import (
 	"encoding/json"
 
-	u "github.com/cdutwhu/go-util"
 	influx "github.com/influxdata/influxdb1-client/v2"
 	"github.com/nsip/n3-messages/messages/pb"
 )
 
 // RootByID :
 func (n3ic *DBClient) RootByID(objID, ctx, del string) (root string) {
-	if !sC(ctx, "-meta") && u.Str(objID).IsUUID() {
+	if !sC(ctx, "-meta") && Str(objID).IsUUID() {
 		if p, _, ok := n3ic.SubExist(&pb.SPOTuple{Subject: objID}, ctx, 0, 0); ok && sC(p, del) {
 			root = sSpl(p, del)[0]
 		}
@@ -22,8 +21,8 @@ func (n3ic *DBClient) RootByID(objID, ctx, del string) (root string) {
 func (n3ic *DBClient) SubExist(tuple *pb.SPOTuple, ctx string, vLow, vHigh int64) (pred, obj string, exist bool) {
 	// pln("checking subject ...")
 
-	vChkL := u.TerOp(vLow > 0, fSf(" AND version>=%d ", vLow), " AND version>0 ").(string)
-	vChkH := u.TerOp(vHigh > 0, fSf(" AND version<=%d ", vHigh), "").(string)
+	vChkL := IF(vLow > 0, fSf(" AND version>=%d ", vLow), " AND version>0 ").(string)
+	vChkH := IF(vHigh > 0, fSf(" AND version<=%d ", vHigh), "").(string)
 
 	qSelect := fSf(`SELECT version, predicate, object FROM "%s" `, ctx)
 	qWhere := fSf(`WHERE subject='%s' `+vChkL+vChkH, tuple.Subject)
@@ -53,7 +52,7 @@ func (n3ic *DBClient) IDListByPathValue(tuple *pb.SPOTuple, ctx string) (ids []s
 	if len(resp.Results[0].Series) > 0 {
 		for _, v := range resp.Results[0].Series[0].Values {
 			id := v[2].(string)
-			if u.Str(id).IsUUID() {
+			if Str(id).IsUUID() {
 				ids = append(ids, id)
 			}
 		}
@@ -108,8 +107,8 @@ func (n3ic *DBClient) IDListByPathValue(tuple *pb.SPOTuple, ctx string) (ids []s
 func (n3ic *DBClient) GetObjs(tuple *pb.SPOTuple, ctx string, extSub, extPred bool, vLow, vHigh int64) (subs, preds, objs []string, vers []int64, found bool) {
 
 	s, p := tuple.Subject, tuple.Predicate
-	vChkL := u.TerOp(vLow > 0, fSf(" AND version>=%d ", vLow), " AND version>0 ").(string)
-	vChkH := u.TerOp(vHigh > 0, fSf(" AND version<=%d ", vHigh), "").(string)
+	vChkL := IF(vLow > 0, fSf(" AND version>=%d ", vLow), " AND version>0 ").(string)
+	vChkH := IF(vHigh > 0, fSf(" AND version<=%d ", vHigh), "").(string)
 
 	qSelect, qWhere := fSf(`SELECT subject, predicate, object, version FROM "%s" `, ctx), ""
 	if extSub && !extPred {

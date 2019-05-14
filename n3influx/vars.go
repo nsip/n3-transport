@@ -5,6 +5,11 @@ import (
 	"strings"
 
 	u "github.com/cdutwhu/go-util"
+	w "github.com/cdutwhu/go-wrappers"
+)
+
+type (
+	Str = w.Str
 )
 
 var (
@@ -13,6 +18,7 @@ var (
 	PH   = u.PanicHandle
 	PC   = u.PanicOnCondition
 	Must = u.Must
+	IF   = u.IF
 
 	fPf  = fmt.Printf
 	fSf  = fmt.Sprintf
