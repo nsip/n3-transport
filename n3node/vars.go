@@ -10,12 +10,13 @@ import (
 )
 
 var (
-	PE   = u.PanicOnError
-	PE1  = u.PanicOnError1
-	PH   = u.PanicHandle
-	PC   = u.PanicOnCondition
-	Must = u.Must
-	IF   = u.IF
+	PE         = u.PanicOnError
+	PE1        = u.PanicOnError1
+	PH         = u.PanicHandle
+	PC         = u.PanicOnCondition
+	Must       = u.Must
+	IF         = u.IF
+	CaseAssign = u.CaseAssign
 
 	INum2Str = w.INum2Str
 
@@ -23,18 +24,20 @@ var (
 	fPf  = fmt.Printf
 	fSf  = fmt.Sprintf
 
-	sHP  = strings.HasPrefix
-	sHS  = strings.HasSuffix
 	sSpl = strings.Split
 
-	prevID        = ""
-	prevPred      = ""
-	prevVer       int64
-	startVer      int64
-	verMeta       int64 = 1
-	mapIDVQueue         = make(map[string][]int64)
-	mapVerInDBChk       = make(map[string]int64)
-	mapTickets          = syncmap.Map{}
+	prevIDv  = ""
+	prevVerV int64
+	prevIDs  = ""
+	prevVerS int64
+	prevIDa  = ""
+	prevVerA int64
+
+	startVer  int64
+	mIDvQueue = make(map[string][]int64)
+	mIDsQueue = make(map[string][]int64)
+	mIDaQueue = make(map[string][]int64)
+	mTickets  = syncmap.Map{}
 )
 
 type (
@@ -56,7 +59,7 @@ type (
 
 const (
 	DEADMARK      = "TOMBSTONE"
-	TERMMARK      = "ENDENDEND"
+	TERMMARK      = "--------------------------------------"
 	DELAY_CONTEST = 2000
 	DELAY_CHKTERM = 5000
 	PATH_DEL      = " ~ "

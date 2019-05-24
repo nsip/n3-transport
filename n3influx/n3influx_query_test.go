@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/nsip/n3-messages/messages/pb"
-	u "github.com/cdutwhu/go-util"
 )
 
 func TestRootByID(t *testing.T) {
@@ -53,11 +52,11 @@ func TestIDListByPathValue(t *testing.T) {
 	// 	fPln(i, ":", id)
 	// }
 	// fPln(" ids2 ------------------------------------- ")
-
-	ids := u.Strs(ids1).ToG().InterSec(u.Strs(ids2).ToG()...)
-	for i, id := range ids {
+	
+	ids := IArrIntersect(Strs(ids1), Strs(ids2))
+	for i, id := range ids.([]string) {
 		fPln(i, ":", id)
-	}	
+	}
 }
 
 // func TestBatTrans(t *testing.T) {

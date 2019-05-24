@@ -9,7 +9,8 @@ import (
 )
 
 type (
-	Str = w.Str
+	Str  = w.Str
+	Strs = w.Strs
 )
 
 var (
@@ -20,9 +21,12 @@ var (
 	Must = u.Must
 	IF   = u.IF
 
+	IArrIntersect = w.IArrIntersect
+
 	fPf  = fmt.Printf
 	fSf  = fmt.Sprintf
 	fPln = fmt.Println
+	fEf  = fmt.Errorf
 
 	sI   = strings.Index
 	sC   = strings.Contains
@@ -33,4 +37,5 @@ const (
 	db         = "tuples"
 	orderByVer = "version" /* NOT supported */
 	orderByTm  = "time"    /* only ORDER BY time supported at this time */
+	DEADMARK   = "TOMBSTONE"
 )
