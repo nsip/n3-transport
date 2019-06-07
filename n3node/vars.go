@@ -17,6 +17,7 @@ var (
 	Must       = u.Must
 	IF         = u.IF
 	CaseAssign = u.CaseAssign
+	GoFn       = u.GoFn
 
 	INum2Str = w.INum2Str
 
@@ -60,8 +61,8 @@ type (
 const (
 	DEADMARK      = "TOMBSTONE"
 	TERMMARK      = "--------------------------------------"
-	DELAY_CONTEST = 2000
-	DELAY_CHKTERM = 5000
 	PATH_DEL      = " ~ "
 	CHILD_DEL     = " + "
+	DELAY_CONTEST = 2000
+	DELAY_CHKTERM = 5000
 )

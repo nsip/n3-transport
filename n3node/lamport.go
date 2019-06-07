@@ -1,11 +1,9 @@
 package n3node
 
 import (
-	"time"
-
 	"../n3influx"
 	"github.com/nsip/n3-messages/messages/pb"
-	"golang.org/x/sync/syncmap"
+	// "golang.org/x/sync/syncmap"
 )
 
 func getVerRange(dbClient *n3influx.DBClient, objID string, ctx, metaType string) (start, end, ver int64) {
@@ -36,30 +34,30 @@ func mkMetaTuple(dbClient *n3influx.DBClient, ctx, id string, start, end int64, 
 }
 
 // ticketRmAsync : args : *n3influx.DBClient, *syncmap.Map, string
-func ticketRmAsync(done <-chan int, id int, args ...interface{}) {
-	dbClient, tkts, ctx := args[0].(*n3influx.DBClient), args[1].(*syncmap.Map), args[2].(string)
-	ctx = Str(ctx).RmSuffix("-meta").V()
-	i := 0
-	for {
-		bInRange := false
-		i++
-		tkts.Range(func(k, v interface{}) bool {
-			bInRange = true
-			if o, _ := dbClient.LastObjVer(&pb.SPOTuple{Subject: v.(*ticket).tktID, Predicate: TERMMARK}, ctx); o == k {
-				tkts.Delete(k)
-			} else {
-				fPf("there is an outstanding@%6d : %s - %s. waiting...\n", i, k, v.(*ticket).tktID)
-				time.Sleep(time.Millisecond * 1000)
-			}
-			return true //                                                          *** continue range ***
-		})
-		time.Sleep(time.Millisecond * DELAY_CHKTERM)
-		if !bInRange {
-			// fPln("pub done !")
-		}
-	}
-	<-done
-}
+// func ticketRmAsync(done <-chan int, id int, args ...interface{}) {
+// 	dbClient, tkts, ctx := args[0].(*n3influx.DBClient), args[1].(*syncmap.Map), args[2].(string)
+// 	ctx = Str(ctx).RmSuffix("-meta").V()
+// 	i := 0
+// 	for {
+// 		bInRange := false
+// 		i++
+// 		tkts.Range(func(k, v interface{}) bool {
+// 			bInRange = true
+// 			if o, _ := dbClient.LastObjVer(&pb.SPOTuple{Subject: v.(*ticket).tktID, Predicate: TERMMARK}, ctx); o == k {
+// 				tkts.Delete(k)
+// 			} else {
+// 				fPf("there is an outstanding@%6d : %s - %s - %s. waiting...\n", i, k, o, v.(*ticket).tktID)
+// 				// time.Sleep(time.Millisecond * 1000)
+// 			}
+// 			return true //                                                          *** continue range ***
+// 		})
+// 		time.Sleep(time.Millisecond * DELAY_CHKTERM)
+// 		if !bInRange {
+// 			// fPln("pub done !")
+// 		}
+// 	}
+// 	<-done
+// }
 
 // assignVer : continue to save, additional tuple, additional context
 func assignVer(dbClient *n3influx.DBClient, tuple *pb.SPOTuple, ctx string) (metaTuple *pb.SPOTuple, metaCtx string) {
@@ -108,31 +106,31 @@ func assignVer(dbClient *n3influx.DBClient, tuple *pb.SPOTuple, ctx string) (met
 }
 
 // inDB : before db storing, if Object is "deleted", it's not inDB
-func inDB(dbClient *n3influx.DBClient, tuple *pb.SPOTuple, ctx string) bool {
-	s, p, _, v := tuple.Subject, tuple.Predicate, tuple.Object, tuple.Version
+// func inDB(dbClient *n3influx.DBClient, tuple *pb.SPOTuple, ctx string) bool {
+// 	s, p, _, v := tuple.Subject, tuple.Predicate, tuple.Object, tuple.Version
 
-	if !Str(ctx).HS("-meta") { //                                                           *** DATA TABLE ***
+// 	if !Str(ctx).HS("-meta") { //                                                           *** DATA TABLE ***
 
-		if Str(s).IsUUID() && p != TERMMARK { //                                            *** VALUES ***
-			if _, end, _ := getVerRange(dbClient, s, ctx, "V"); v <= end {
-				return true
-			}
-		} else if Str(p).HP("::") { //                                                      *** STRUCT ***
-			if _, end, _ := getVerRange(dbClient, p, ctx, "S"); v <= end {
-				return true
-			}
-		} else if Str(p).HP("[]") { //                                                      *** ARRAY ***
-			if _, end, _ := getVerRange(dbClient, p, ctx, "A"); v <= end {
-				return true
-			}
-		} else { //                                                                         *** TERMMARK ***
-			return dbClient.TupleExists(tuple, ctx, "Subject")
-		}
+// 		if Str(s).IsUUID() && p != TERMMARK { //                                            *** VALUES ***
+// 			if _, end, _ := getVerRange(dbClient, s, ctx, "V"); v <= end {
+// 				return true
+// 			}
+// 		} else if Str(p).HP("::") { //                                                      *** STRUCT ***
+// 			if _, end, _ := getVerRange(dbClient, p, ctx, "S"); v <= end {
+// 				return true
+// 			}
+// 		} else if Str(p).HP("[]") { //                                                      *** ARRAY ***
+// 			if _, end, _ := getVerRange(dbClient, p, ctx, "A"); v <= end {
+// 				return true
+// 			}
+// 		} else { //                                                                         *** TERMMARK ***
+// 			return dbClient.TupleExists(tuple, ctx, "Subject")
+// 		}
 
-	} else { //                                                                             *** META TABLE ***
+// 	} else { //                                                                             *** META TABLE ***
 
-		return dbClient.TupleExists(tuple, ctx)
-	}
+// 		return dbClient.TupleExists(tuple, ctx)
+// 	}
 
-	return false
-}
+// 	return false
+// }

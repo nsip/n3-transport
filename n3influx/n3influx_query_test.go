@@ -2,7 +2,6 @@ package n3influx
 
 import (
 	"testing"
-	"time"
 
 	"github.com/nsip/n3-messages/messages/pb"
 )
@@ -10,30 +9,37 @@ import (
 func TestRootByID(t *testing.T) {
 	defer func() { PH(recover(), "./log.txt") }()
 	dbClient := Must(NewDBClient()).(*DBClient)
-	fPln(dbClient.RootByID("D3E34F41-9D75-101A-8C3D-00AA001A1656", "abc-sif", " ~ "))
+	fPln(dbClient.RootByID("D3E34F41-9D75-101A-8C3D-00AA001A1656", "demo", " ~ "))
 }
 
-func TestGetObjs(t *testing.T) {
+func TestObjectCount(t *testing.T) {
 	defer func() { PH(recover(), "./log.txt") }()
 	dbClient := Must(NewDBClient()).(*DBClient)
-
-	// tuple := &pb.SPOTuple{Subject: "D3E34F41-9D75-101A-8C3D-00AA001A1656", Predicate: "StaffPersonal"}
-	tuple := &pb.SPOTuple{Subject: "StaffPersonal", Predicate: "::"}
-	if ss, ps, os, vs, ok := dbClient.GetObjs(tuple, "abc-sif", true, false, 0, 0); ok {
-		for i := range ss {
-			fPln(ss[i], ps[i], os[i], vs[i])
-			/*************************************************/
-			tuple1 := &pb.SPOTuple{
-				Subject:   ss[i],
-				Predicate: ps[i],
-				Object:    os[i],
-				Version:   vs[i],
-			}
-			PE(dbClient.StoreTuple(tuple1, "temp"))
-		}
-	}
-	time.Sleep(20 * time.Millisecond)
+	n := dbClient.ObjectCount("demo", "id")
+	fPln("object count:", n)
 }
+
+// func TestGetObjs(t *testing.T) {
+// 	defer func() { PH(recover(), "./log.txt") }()
+// 	dbClient := Must(NewDBClient()).(*DBClient)
+
+// 	// tuple := &pb.SPOTuple{Subject: "D3E34F41-9D75-101A-8C3D-00AA001A1656", Predicate: "StaffPersonal"}
+// 	tuple := &pb.SPOTuple{Subject: "StaffPersonal", Predicate: "::"}
+// 	if ss, ps, os, vs, ok := dbClient.GetObjs(tuple, "demo", true, false, 0, 0); ok {
+// 		for i := range ss {
+// 			fPln(ss[i], ps[i], os[i], vs[i])
+// 			/*************************************************/
+// 			tuple1 := &pb.SPOTuple{
+// 				Subject:   ss[i],
+// 				Predicate: ps[i],
+// 				Object:    os[i],
+// 				Version:   vs[i],
+// 			}
+// 			PE(dbClient.StoreTuple(tuple1, "temp"))
+// 		}
+// 	}
+// 	time.Sleep(20 * time.Millisecond)
+// }
 
 func TestIDListByPathValue(t *testing.T) {
 	defer func() { PH(recover(), "./log.txt") }()
@@ -52,7 +58,7 @@ func TestIDListByPathValue(t *testing.T) {
 	// 	fPln(i, ":", id)
 	// }
 	// fPln(" ids2 ------------------------------------- ")
-	
+
 	ids := IArrIntersect(Strs(ids1), Strs(ids2))
 	for i, id := range ids.([]string) {
 		fPln(i, ":", id)

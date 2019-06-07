@@ -204,3 +204,20 @@ func (n3ic *DBClient) Status(ObjID, ctx string) (exist, alive bool) {
 	pred, _, exist := n3ic.SubjectExist(ObjID, ctx, -1, -1)
 	return exist, pred != DEADMARK
 }
+
+// ObjectCount :
+func (n3ic *DBClient) ObjectCount(ctx, objIDMark string) int64 {
+
+	qSelect := fSf(`SELECT count(*) FROM "%s" `, ctx)
+	qWhere := fSf(`WHERE predicate=~/ ~ %s$/ AND predicate!~/ ~ [A-Za-z]+ ~ %s$/`, objIDMark, objIDMark)
+	qStr := qSelect + qWhere
+	resp, e := n3ic.cl.Query(influx.NewQuery(qStr, db, ""))
+	PE(e, resp.Error())
+	if len(resp.Results[0].Series) > 0 {
+		for _, v := range resp.Results[0].Series[0].Values {
+			// fPln("object count:", v[1])
+			return Must(v[1].(json.Number).Int64()).(int64)
+		}
+	}
+	return 0
+}

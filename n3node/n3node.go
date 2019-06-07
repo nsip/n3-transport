@@ -293,12 +293,19 @@ func (n3c *N3Node) startWriteHandler() error {
 		tuple := Must(messages.DecodeTuple(n3msg.Payload)).(*pb.SPOTuple)
 		s, p, o, ctx := tuple.Subject, tuple.Predicate, tuple.Object, n3msg.CtxName
 
-		fPf("Query : <%s> <%s> <%s> <%s>\n", s, p, o, ctx)
+		// fPf("Query : <%s> <%s> <%s> <%s>\n", s, p, o, ctx)
 
-		if s == "" && p != "" && o != "" { //                                              *** subject ID List query ***
-			ids := dbClient.IDListByPathValue(tuple, ctx)
-			for _, id := range ids {
+		if s == "*" && p != "" && o != "" { //    *** subject ID List query (including deleted) ***
+			for _, id := range dbClient.IDListByPathValue(tuple, ctx) {
 				ts = append(ts, &pb.SPOTuple{Subject: id, Predicate: p, Object: o})
+			}
+			return
+		}
+		if s == "" && p != "" && o != "" { //     *** subject ID List query ***
+			for _, id := range dbClient.IDListByPathValue(tuple, ctx) {
+				if exist, alive := dbClient.Status(id, ctx); exist && alive {
+					ts = append(ts, &pb.SPOTuple{Subject: id, Predicate: p, Object: o})
+				}
 			}
 			return
 		}
@@ -312,8 +319,7 @@ func (n3c *N3Node) startWriteHandler() error {
 		case "[]", "::": // *** array / struct query ***
 			{
 				metaType := CaseAssign(p, "::", "[]", "S", "A").(string)
-				start, end, _ := getVerRange(dbClient, p+s, ctx, metaType) // *** Meta file to check alive ***
-				if start >= 1 {
+				if start, end, _ := getVerRange(dbClient, p+s, ctx, metaType); start >= 1 { // *** Meta file to check alive ***
 					root := dbClient.RootByID(s, ctx, PATH_DEL)
 					if ss, _, os, vs, ok := dbClient.GetObjsBySP(&pb.SPOTuple{Subject: root, Predicate: p + s}, ctx, true, false, start, end); ok {
 						for i := range ss {
@@ -334,17 +340,15 @@ func (n3c *N3Node) startWriteHandler() error {
 					metaType = "V"
 				}
 
-				if Str(ctx).HS("-meta") { //                                *** REQUEST A TICKET ***
-					_, end, v := getVerRange(dbClient, s, ctx, metaType) // *** Meta file to check alive ***
-					if end != -1 {
-						return mkTicket(dbClient, ctx, s, end, v) //        *** make a ticket for publishing, -1 means it's dead ***
+				if Str(ctx).HS("-meta") { //    *** REQUEST A TICKET ***
+					if _, end, v := getVerRange(dbClient, s, ctx, metaType); end != -1 { // *** Meta file to check alive ***
+						return mkTicket(dbClient, ctx, s, end, v) //                        *** make a ticket for publishing, -1 means it's dead ***
 					}
 					return
 				}
 
-				//                                                          *** GENERAL QUERY ***
-				start, end, _ := getVerRange(dbClient, s, ctx, metaType) // *** Meta file to check alive ***
-				if start >= 1 {
+				//                               *** GENERAL QUERY ***
+				if start, end, _ := getVerRange(dbClient, s, ctx, metaType); start >= 1 { // *** Meta file to check alive ***
 					dbClient.QueryTuplesBySP(tuple, ctx, &ts, start, end)
 				}
 			}
@@ -423,9 +427,9 @@ func (n3c *N3Node) startReadHandler() error {
 		}
 
 		// *** exclude "legend liftbridge data" ***
-		if inDB(pub, tuple, n3msg.CtxName) {
-			return
-		}
+		// if inDB(pub, tuple, n3msg.CtxName) {
+		// 	return
+		// }
 
 		err = pub.StoreTuple(tuple, n3msg.CtxName)
 		if err != nil {
