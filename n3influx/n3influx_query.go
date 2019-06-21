@@ -14,27 +14,17 @@ func (n3ic *DBClient) TupleExists(tuple *pb.SPOTuple, ctx string, ignoreFields .
 	qSelect := fSf(`SELECT version, subject, predicate, object FROM "%s" `, ctx)
 	qWhere := fSf(`WHERE subject='%s' AND predicate='%s' AND object='%s' AND version=%d `, s, p, o, v)
 
-	L := len(ignoreFields)
-	PC(L != 0 && L != 1, fEf("Currently only support ignoring 1 Field(s)"))
-
-	if L == 1 {
+	if L := len(ignoreFields); L == 1 {
+		// PC(L != 0 && L != 1, fEf("Currently only support ignoring 1 Field(s)"))
 		switch ignoreFields[0] {
 		case "Subject", "subject", "Sub", "sub", "S", "s":
-			{
-				qWhere = fSf(`WHERE predicate='%s' AND object='%s' AND version=%d `, p, o, v)
-			}
+			qWhere = fSf(`WHERE predicate='%s' AND object='%s' AND version=%d `, p, o, v)
 		case "Predicate", "predicate", "P", "p":
-			{
-				qWhere = fSf(`WHERE subject='%s' AND object='%s' AND version=%d `, s, o, v)
-			}
+			qWhere = fSf(`WHERE subject='%s' AND object='%s' AND version=%d `, s, o, v)
 		case "Object", "object", "Obj", "obj", "O", "o":
-			{
-				qWhere = fSf(`WHERE subject='%s' AND predicate='%s' AND version=%d `, s, p, v)
-			}
+			qWhere = fSf(`WHERE subject='%s' AND predicate='%s' AND version=%d `, s, p, v)
 		case "Version", "version", "Ver", "ver", "V", "v":
-			{
-				qWhere = fSf(`WHERE subject='%s' AND predicate='%s' AND object='%s' `, s, p, o)
-			}
+			qWhere = fSf(`WHERE subject='%s' AND predicate='%s' AND object='%s' `, s, p, o)
 		}
 	}
 
@@ -61,7 +51,6 @@ func (n3ic *DBClient) SubjectExist(subject, ctx string, vLow, vHigh int64) (pred
 		lastItem := resp.Results[0].Series[0].Values[0]
 		pred, obj, exist = lastItem[2].(string), lastItem[3].(string), true
 	}
-
 	return
 }
 
@@ -76,9 +65,13 @@ func (n3ic *DBClient) RootByID(objID, ctx, del string) (root string) {
 }
 
 // IDListByPathValue :
-func (n3ic *DBClient) IDListByPathValue(tuple *pb.SPOTuple, ctx string) (ids []string) {
+func (n3ic *DBClient) IDListByPathValue(tuple *pb.SPOTuple, ctx string, caseSensitive bool) (ids []string) {
 	qSelect := fSf(`SELECT version, subject FROM "%s" `, ctx)
 	qWhere := fSf(`WHERE predicate='%s' AND object='%s' `, tuple.Predicate, tuple.Object)
+	if !caseSensitive {
+		objRegex := regex4CaseIns(tuple.Object)
+		qWhere = fSf(`WHERE predicate='%s' AND object=~/%s/`, tuple.Predicate, objRegex)
+	}
 	qStr := qSelect + qWhere + fSf(`ORDER BY %s`, orderByTm)
 	resp, e := n3ic.cl.Query(influx.NewQuery(qStr, db, ""))
 	PE(e, resp.Error())

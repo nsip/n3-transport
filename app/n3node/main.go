@@ -66,7 +66,7 @@ func launchServices() error {
 	var serviceError error
 	cnclGnatsd, serviceError = launchGnatsd()
 	if serviceError != nil {
-		return errors.Wrap(serviceError, "cannot launch gnatsd service:")
+		return errors.Wrap(serviceError, "cannot launch nats-server service:")
 	}
 	log.Println("...gnats service up.")
 	cnclLiftbridge, serviceError = launchLiftbridge()
@@ -147,7 +147,7 @@ func launchGnatsd() (func(), error) {
 	// set up a management context
 	ctx, cancel := context.WithCancel(context.Background())
 
-	gnatsCmd := exec.CommandContext(ctx, "./gnatsd")
+	gnatsCmd := exec.CommandContext(ctx, "./nats-server")
 	gnatsCmd.Stdout = os.Stdout
 	gnatsCmd.Stderr = os.Stderr
 	gnatsCmd.Dir = "./services/gnatsd"
@@ -195,7 +195,7 @@ func closeServices() {
 	cnclLiftbridge()
 	log.Println("...liftbridge service shut down")
 	cnclGnatsd()
-	log.Println("...gnatsd service shut down")
+	log.Println("...nats-server service shut down")
 	cnclInflux()
 	log.Println("...influx service shut down")
 

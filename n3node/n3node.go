@@ -296,13 +296,13 @@ func (n3c *N3Node) startWriteHandler() error {
 		// fPf("Query : <%s> <%s> <%s> <%s>\n", s, p, o, ctx)
 
 		if s == "*" && p != "" && o != "" { //    *** subject ID List query (including deleted) ***
-			for _, id := range dbClient.IDListByPathValue(tuple, ctx) {
+			for _, id := range dbClient.IDListByPathValue(tuple, ctx, false) {
 				ts = append(ts, &pb.SPOTuple{Subject: id, Predicate: p, Object: o})
 			}
 			return
 		}
 		if s == "" && p != "" && o != "" { //     *** subject ID List query ***
-			for _, id := range dbClient.IDListByPathValue(tuple, ctx) {
+			for _, id := range dbClient.IDListByPathValue(tuple, ctx, false) {
 				if exist, alive := dbClient.Status(id, ctx); exist && alive {
 					ts = append(ts, &pb.SPOTuple{Subject: id, Predicate: p, Object: o})
 				}
