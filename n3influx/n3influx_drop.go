@@ -10,6 +10,6 @@ func (n3ic *DBClient) DropCtx(ctxNames ...string) {
 	for _, ctx := range ctxNames {
 		qStr := fSf(`DROP MEASUREMENT "%s"`, ctx)
 		resp, e := n3ic.cl.Query(influx.NewQuery(qStr, db, ""))
-		PE(e, resp.Error())
+		pe(e, resp.Error())
 	}
 }

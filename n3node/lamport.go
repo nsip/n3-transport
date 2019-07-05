@@ -8,10 +8,10 @@ import (
 
 func getVerRange(dbClient *n3influx.DBClient, objID string, ctx, metaType string) (start, end, ver int64) {
 	if exist, alive := dbClient.Status(objID, ctx); exist && alive {
-		o, v := dbClient.LastObjVer(&pb.SPOTuple{Subject: objID, Predicate: metaType}, Str(ctx).MkSuffix("-meta").V())
+		o, v := dbClient.LastObjVer(&pb.SPOTuple{Subject: objID, Predicate: metaType}, S(ctx).MkSuffix("-meta").V())
 		if v != -1 {
 			ss := sSpl(o, "-")
-			start, end, ver = Str(ss[0]).ToInt64(), Str(ss[1]).ToInt64(), v
+			start, end, ver = S(ss[0]).ToInt64(), S(ss[1]).ToInt64(), v
 		}
 	} else if !exist {
 		start, end, ver = 0, 0, 0
@@ -22,7 +22,7 @@ func getVerRange(dbClient *n3influx.DBClient, objID string, ctx, metaType string
 }
 
 func mkMetaTuple(dbClient *n3influx.DBClient, ctx, id string, start, end int64, metaType string) (*pb.SPOTuple, string) {
-	ctxMeta := Str(ctx).MkSuffix("-meta").V()
+	ctxMeta := S(ctx).MkSuffix("-meta").V()
 	_, v := dbClient.LastObjVer(&pb.SPOTuple{Subject: id, Predicate: metaType}, ctxMeta)
 	return &pb.SPOTuple{
 			Subject:   id,
@@ -43,7 +43,7 @@ func mkMetaTuple(dbClient *n3influx.DBClient, ctx, id string, start, end int64, 
 // 		i++
 // 		tkts.Range(func(k, v interface{}) bool {
 // 			bInRange = true
-// 			if o, _ := dbClient.LastObjVer(&pb.SPOTuple{Subject: v.(*ticket).tktID, Predicate: TERMMARK}, ctx); o == k {
+// 			if o, _ := dbClient.LastObjVer(&pb.SPOTuple{Subject: v.(*ticket).tktID, Predicate: MARKTerm}, ctx); o == k {
 // 				tkts.Delete(k)
 // 			} else {
 // 				fPf("there is an outstanding@%6d : %s - %s - %s. waiting...\n", i, k, o, v.(*ticket).tktID)
@@ -65,41 +65,44 @@ func assignVer(dbClient *n3influx.DBClient, tuple *pb.SPOTuple, ctx string) (met
 	s, p, o, v := tuple.Subject, tuple.Predicate, tuple.Object, tuple.Version
 	fPln("assignVer:", s, p, o, v)
 
-	if Str(s).IsUUID() && !Str(o).HP("::") && !Str(o).HP("[]") { //            *** value tuple ***
+	if S(s).IsUUID() && !S(o).HP("::") && !S(o).HP("[]") { //        *** value tuple *** (exclude S & A terminator)
 
-		if s != prevIDv && p != TERMMARK { //         *** New ID (NOT Terminator) is coming ***
+		if s != prevIDv && p != MARKTerm { //         *** New ID (NOT Terminator) is coming ***
 			mIDvQueue[s] = append(mIDvQueue[s], v) // *** Put incoming version into its own queue ***
 			l := len(mIDvQueue[s])
 			startVer = mIDvQueue[s][l-1]
 		}
-		if p == TERMMARK { //                         *** Terminator, ready to create a meta tuple ***
+		if p == MARKTerm { //                         *** Terminator, ready to create a meta tuple ***
 			metaTuple, metaCtx = mkMetaTuple(dbClient, ctx, prevIDv, startVer, prevVerV, "V")
 		}
 		prevIDv, prevVerV = s, v
 
-	} else if Str(p).HP("::") || (Str(s).IsUUID() && Str(o).HP("::")) { //     *** struct tuple ***
+	} else if S(p).HP("::") || (S(s).IsUUID() && S(o).HP("::")) { // *** struct tuple *** (include S terminator)
 
-		if p != prevIDs && p != TERMMARK {
+		if p != prevIDs && p != MARKTerm {
 			mIDsQueue[p] = append(mIDsQueue[p], v)
 			l := len(mIDsQueue[p])
 			startVer = mIDsQueue[p][l-1]
 		}
-		if p == TERMMARK {
+		if p == MARKTerm {
 			metaTuple, metaCtx = mkMetaTuple(dbClient, ctx, prevIDs, startVer, prevVerS, "S")
 		}
 		prevIDs, prevVerS = p, v
 
-	} else if Str(p).HP("[]") || (Str(s).IsUUID() && Str(o).HP("[]")) { //     *** array tuple ***
+	} else if S(p).HP("[]") || (S(s).IsUUID() && S(o).HP("[]")) { // *** array tuple *** (include A terminator)
 
-		if p != prevIDa && p != TERMMARK {
+		if p != prevIDa && p != MARKTerm {
 			mIDaQueue[p] = append(mIDaQueue[p], v)
 			l := len(mIDaQueue[p])
 			startVer = mIDaQueue[p][l-1]
 		}
-		if p == TERMMARK {
+		if p == MARKTerm {
 			metaTuple, metaCtx = mkMetaTuple(dbClient, ctx, prevIDa, startVer, prevVerA, "A")
 		}
 		prevIDa, prevVerA = p, v
+
+	} else {
+
 	}
 
 	return
@@ -109,25 +112,25 @@ func assignVer(dbClient *n3influx.DBClient, tuple *pb.SPOTuple, ctx string) (met
 // func inDB(dbClient *n3influx.DBClient, tuple *pb.SPOTuple, ctx string) bool {
 // 	s, p, _, v := tuple.Subject, tuple.Predicate, tuple.Object, tuple.Version
 
-// 	if !Str(ctx).HS("-meta") { //                                                           *** DATA TABLE ***
+// 	if !S(ctx).HS("-meta") { //                                                           *** DATA TABLE ***
 
-// 		if Str(s).IsUUID() && p != TERMMARK { //                                            *** VALUES ***
+// 		if S(s).IsUUID() && p != MARKTerm { //                                            *** VALUES ***
 // 			if _, end, _ := getVerRange(dbClient, s, ctx, "V"); v <= end {
 // 				return true
 // 			}
-// 		} else if Str(p).HP("::") { //                                                      *** STRUCT ***
+// 		} else if S(p).HP("::") { //                                                      *** STRUCT ***
 // 			if _, end, _ := getVerRange(dbClient, p, ctx, "S"); v <= end {
 // 				return true
 // 			}
-// 		} else if Str(p).HP("[]") { //                                                      *** ARRAY ***
+// 		} else if S(p).HP("[]") { //                                                      *** ARRAY ***
 // 			if _, end, _ := getVerRange(dbClient, p, ctx, "A"); v <= end {
 // 				return true
 // 			}
-// 		} else { //                                                                         *** TERMMARK ***
+// 		} else { //                                                                       *** MARKTerm ***
 // 			return dbClient.TupleExists(tuple, ctx, "Subject")
 // 		}
 
-// 	} else { //                                                                             *** META TABLE ***
+// 	} else { //                                                                           *** META TABLE ***
 
 // 		return dbClient.TupleExists(tuple, ctx)
 // 	}

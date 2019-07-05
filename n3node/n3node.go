@@ -24,7 +24,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-//
+// N3Node :
 // main node tht handles read / write operations
 // with the transport layer
 //
@@ -32,13 +32,14 @@ type N3Node struct {
 	natsConn         *nats.Conn
 	lbConn           liftbridge.Client
 	handlerContexts  map[string]func()
-	dispatcherId     string
+	dispatcherID     string
 	mutex            sync.Mutex
 	pubKey           string
 	privKey          string
 	approvedContexts map[string]bool
 }
 
+// NewNode :
 func NewNode() (*N3Node, error) {
 
 	err := checkConfig()
@@ -233,7 +234,7 @@ func (n3c *N3Node) startWriteHandler() error {
 		// TODO: *** assign lamport clock version ***
 		tupleQueue, ctxQueue := []*pb.SPOTuple{tuple}, []string{n3msg.CtxName}
 
-		if tuple.Predicate == DEADMARK { //          *** Delete object ***
+		if tuple.Predicate == MARKDead { //          *** Delete object ***
 			if exist, alive := dbClient.Status(tuple.Subject, n3msg.CtxName); exist && alive {
 				tupleQueue[0] = &pb.SPOTuple{
 					Subject:   tuple.Subject,
@@ -241,7 +242,7 @@ func (n3c *N3Node) startWriteHandler() error {
 					Object:    time.Now().Format("2006-01-02 15:04:05"),
 					Version:   999999,
 				}
-				ctxQueue[0] = Str(n3msg.CtxName).MkSuffix("-meta").V()
+				ctxQueue[0] = S(n3msg.CtxName).MkSuffix("-meta").V()
 			} else {
 				return
 			}
@@ -290,7 +291,17 @@ func (n3c *N3Node) startWriteHandler() error {
 	// *** set up handler for query by inbound messages ***
 	qHandler := func(n3msg *pb.N3Message) (ts []*pb.SPOTuple) {
 
-		tuple := Must(messages.DecodeTuple(n3msg.Payload)).(*pb.SPOTuple)
+		// force sender id to be this node
+		n3msg.SndId = n3c.pubKey
+
+		// check authorisation
+		approvalScope := fmt.Sprintf("%s.%s.%s", n3msg.SndId, n3msg.NameSpace, n3msg.CtxName)
+		if !n3c.approved(approvalScope) {
+			log.Println("you are not authorised to query to context: ", n3msg.NameSpace, n3msg.CtxName)
+			return
+		}
+
+		tuple := must(messages.DecodeTuple(n3msg.Payload)).(*pb.SPOTuple)
 		s, p, o, ctx := tuple.Subject, tuple.Predicate, tuple.Object, n3msg.CtxName
 
 		// fPf("Query : <%s> <%s> <%s> <%s>\n", s, p, o, ctx)
@@ -313,14 +324,14 @@ func (n3c *N3Node) startWriteHandler() error {
 		switch p {
 		case "": //         *** root query ***
 			{
-				root := dbClient.RootByID(s, ctx, PATH_DEL)
+				root := dbClient.RootByID(s, ctx, DELIPath)
 				ts = append(ts, &pb.SPOTuple{Subject: s, Predicate: "root", Object: root})
 			}
 		case "[]", "::": // *** array / struct query ***
 			{
-				metaType := CaseAssign(p, "::", "[]", "S", "A").(string)
+				metaType := caseAssign(p, "::", "[]", "S", "A").(string)
 				if start, end, _ := getVerRange(dbClient, p+s, ctx, metaType); start >= 1 { // *** Meta file to check alive ***
-					root := dbClient.RootByID(s, ctx, PATH_DEL)
+					root := dbClient.RootByID(s, ctx, DELIPath)
 					if ss, _, os, vs, ok := dbClient.GetObjsBySP(&pb.SPOTuple{Subject: root, Predicate: p + s}, ctx, true, false, start, end); ok {
 						for i := range ss {
 							ts = append(ts, &pb.SPOTuple{Subject: s, Predicate: ss[i], Object: os[i], Version: vs[i]})
@@ -332,15 +343,15 @@ func (n3c *N3Node) startWriteHandler() error {
 			{
 				metaType := ""
 				switch {
-				case Str(s).HP("::"):
+				case S(s).HP("::"):
 					metaType = "S"
-				case Str(s).HP("[]"):
+				case S(s).HP("[]"):
 					metaType = "A"
 				default:
 					metaType = "V"
 				}
 
-				if Str(ctx).HS("-meta") { //    *** REQUEST A TICKET ***
+				if S(ctx).HS("-meta") { //    *** REQUEST A TICKET ***
 					if _, end, v := getVerRange(dbClient, s, ctx, metaType); end != -1 { // *** Meta file to check alive ***
 						return mkTicket(dbClient, ctx, s, end, v) //                        *** make a ticket for publishing, -1 means it's dead ***
 					}
@@ -491,7 +502,7 @@ func (n3c *N3Node) removeHandlerContext(name string) {
 
 }
 
-//
+// Close :
 // shuts down connections, closes handlers
 //
 func (n3c *N3Node) Close() {
@@ -504,7 +515,7 @@ func (n3c *N3Node) Close() {
 	n3c.lbConn.Close()
 
 	// close all handlers by invoking cancelfunc on associated contexts
-	for name, _ := range n3c.handlerContexts {
+	for name := range n3c.handlerContexts {
 		n3c.removeHandlerContext(name)
 	}
 

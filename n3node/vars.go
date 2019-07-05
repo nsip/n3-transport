@@ -10,13 +10,9 @@ import (
 )
 
 var (
-	PE         = u.PanicOnError
-	PE1        = u.PanicOnError1
-	PH         = u.PanicHandle
-	PC         = u.PanicOnCondition
-	Must       = u.Must
+	must       = u.Must
 	IF         = u.IF
-	CaseAssign = u.CaseAssign
+	caseAssign = u.CaseAssign
 	GoFn       = u.GoFn
 
 	INum2Str = w.INum2Str
@@ -54,15 +50,15 @@ type (
 		idx   string
 	}
 
-	Str = w.Str
+	S   = w.Str
 	I64 = w.I64
 )
 
 const (
-	DEADMARK      = "TOMBSTONE"
-	TERMMARK      = "--------------------------------------"
-	PATH_DEL      = " ~ "
-	CHILD_DEL     = " + "
+	MARKDead      = "TOMBSTONE"
+	MARKTerm      = "--------------------------------------"
+	DELIPath      = " ~ "
+	DELIChild     = " + "
 	DELAY_CONTEST = 2000
 	DELAY_CHKTERM = 5000
 )

@@ -9,16 +9,16 @@ import (
 )
 
 type (
-	Str  = w.Str
-	Strs = w.Strs
+	S  = w.Str
+	Ss = w.Strs
 )
 
 var (
-	PE   = u.PanicOnError
-	PE1  = u.PanicOnError1
-	PH   = u.PanicHandle
-	PC   = u.PanicOnCondition
-	Must = u.Must
+	pe   = u.PanicOnError
+	pe1  = u.PanicOnError1
+	ph   = u.PanicHandle
+	pc   = u.PanicOnCondition
+	must = u.Must
 	IF   = u.IF
 
 	IArrIntersect = w.IArrIntersect
@@ -28,8 +28,6 @@ var (
 	fPln = fmt.Println
 	fEf  = fmt.Errorf
 
-	sI   = strings.Index
-	sC   = strings.Contains
 	sSpl = strings.Split
 )
 
@@ -37,5 +35,5 @@ const (
 	db         = "tuples"
 	orderByVer = "version" /* NOT supported */
 	orderByTm  = "time"    /* only ORDER BY time supported at this time */
-	DEADMARK   = "TOMBSTONE"
+	MARKDead   = "TOMBSTONE"
 )

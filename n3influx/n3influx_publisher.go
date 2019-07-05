@@ -12,11 +12,13 @@ import (
 	"github.com/spf13/viper"
 )
 
+// DBClient :
 type DBClient struct {
 	cl influx.Client
 	ch chan *influx.Point
 }
 
+// NewDBClient :
 func NewDBClient() (*DBClient, error) {
 
 	n3ic := &DBClient{
@@ -33,6 +35,7 @@ func NewDBClient() (*DBClient, error) {
 	return n3ic, nil
 }
 
+// Query :
 func (n3ic *DBClient) Query(q influx.Query) (*influx.Response, error) {
 	return n3ic.cl.Query(q)
 }
@@ -109,7 +112,7 @@ func (n3ic *DBClient) startStorageHandler() {
 	}
 }
 
-//
+// StoreTuple :
 // send the tuple to influx, passes into batching storage handler
 //
 func (n3ic *DBClient) StoreTuple(tuple *pb.SPOTuple, contextName string) error {
@@ -141,7 +144,7 @@ func (n3ic *DBClient) StoreTuple(tuple *pb.SPOTuple, contextName string) error {
 	return nil
 }
 
-//
+// KillTuple :
 // send the tuple to influx, passes into batching storage handler
 //
 func (n3ic *DBClient) KillTuple(tuple *pb.SPOTuple, contextName string) error {
@@ -173,7 +176,7 @@ func (n3ic *DBClient) KillTuple(tuple *pb.SPOTuple, contextName string) error {
 	return nil
 }
 
-// "delete" the tuple: tuple is stored but tombstoned
+// DeleteTuple : "delete" the tuple: tuple is stored but tombstoned
 func (n3ic *DBClient) DeleteTuple(tuple *pb.SPOTuple, contextName string) error {
 
 	// extract data from tuple and use to construct point

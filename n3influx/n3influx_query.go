@@ -30,7 +30,7 @@ func (n3ic *DBClient) TupleExists(tuple *pb.SPOTuple, ctx string, ignoreFields .
 
 	qStr := qSelect + qWhere + fSf(`ORDER BY %s DESC`, orderByTm)
 	resp, e := n3ic.cl.Query(influx.NewQuery(qStr, db, ""))
-	PE(e, resp.Error())
+	pe(e, resp.Error())
 	return len(resp.Results[0].Series) > 0 && len(resp.Results[0].Series[0].Values) > 0
 }
 
@@ -44,7 +44,7 @@ func (n3ic *DBClient) SubjectExist(subject, ctx string, vLow, vHigh int64) (pred
 	qWhere := fSf(`WHERE subject='%s' `+vChkL+vChkH, subject)
 	qStr := qSelect + qWhere + fSf(`ORDER BY %s DESC LIMIT 1`, orderByTm)
 	resp, e := n3ic.cl.Query(influx.NewQuery(qStr, db, ""))
-	PE(e, resp.Error())
+	pe(e, resp.Error())
 
 	// pln(resp.Results[0].Series[0].Values[0][1]) /* [0] is time, [1] is as SELECT ... */
 	if len(resp.Results[0].Series) > 0 && len(resp.Results[0].Series[0].Values) > 0 {
@@ -55,13 +55,13 @@ func (n3ic *DBClient) SubjectExist(subject, ctx string, vLow, vHigh int64) (pred
 }
 
 // RootByID :
-func (n3ic *DBClient) RootByID(objID, ctx, del string) (root string) {
-	if !sC(ctx, "-meta") && Str(objID).IsUUID() {
-		if p, _, ok := n3ic.SubjectExist(objID, ctx, 0, 0); ok && sC(p, del) {
-			root = sSpl(p, del)[0]
+func (n3ic *DBClient) RootByID(objID, ctx, del string) string {
+	if !S(ctx).HS("-meta") && S(objID).IsUUID() {
+		if p, _, ok := n3ic.SubjectExist(objID, ctx, 0, 0); ok && S(p).Contains(del) {
+			return sSpl(p, del)[0]			
 		}
 	}
-	return
+	return ""
 }
 
 // IDListByPathValue :
@@ -74,11 +74,11 @@ func (n3ic *DBClient) IDListByPathValue(tuple *pb.SPOTuple, ctx string, caseSens
 	}
 	qStr := qSelect + qWhere + fSf(`ORDER BY %s`, orderByTm)
 	resp, e := n3ic.cl.Query(influx.NewQuery(qStr, db, ""))
-	PE(e, resp.Error())
+	pe(e, resp.Error())
 	if len(resp.Results[0].Series) > 0 {
 		for _, v := range resp.Results[0].Series[0].Values {
 			id := v[2].(string)
-			if Str(id).IsUUID() {
+			if S(id).IsUUID() {
 				ids = append(ids, id)
 			}
 		}
@@ -148,13 +148,13 @@ func (n3ic *DBClient) GetObjsBySP(tuple *pb.SPOTuple, ctx string, extSub, extPre
 	qStr := qSelect + qWhere + fSf(`ORDER BY %s DESC`, orderByTm)
 
 	resp, e := n3ic.cl.Query(influx.NewQuery(qStr, db, ""))
-	PE(e, resp.Error())
+	pe(e, resp.Error())
 
 	if len(resp.Results[0].Series) > 0 && len(resp.Results[0].Series[0].Values) > 0 {
 		for _, l := range resp.Results[0].Series[0].Values {
 			sub, pred, obj := l[1].(string), l[2].(string), l[3].(string)
 			subs, preds, objs = append(subs, sub), append(preds, pred), append(objs, obj)
-			vers = append(vers, Must(l[4].(json.Number).Int64()).(int64))
+			vers = append(vers, must(l[4].(json.Number).Int64()).(int64))
 			// fPln(pred, obj, ver)
 		}
 		found = true
@@ -191,11 +191,11 @@ func (n3ic *DBClient) LastObjVer(tuple *pb.SPOTuple, ctx string) (string, int64)
 
 // Status :
 func (n3ic *DBClient) Status(ObjID, ctx string) (exist, alive bool) {
-	ctx = Str(ctx).MkSuffix("-meta").V()
-	ObjID = Str(ObjID).RmPrefix("::").V()
-	ObjID = Str(ObjID).RmPrefix("[]").V()
+	ctx = S(ctx).MkSuffix("-meta").V()
+	ObjID = S(ObjID).RmPrefix("::").V()
+	ObjID = S(ObjID).RmPrefix("[]").V()
 	pred, _, exist := n3ic.SubjectExist(ObjID, ctx, -1, -1)
-	return exist, pred != DEADMARK
+	return exist, pred != MARKDead
 }
 
 // ObjectCount :
@@ -205,11 +205,11 @@ func (n3ic *DBClient) ObjectCount(ctx, objIDMark string) int64 {
 	qWhere := fSf(`WHERE predicate=~/ ~ %s$/ AND predicate!~/ ~ [A-Za-z]+ ~ %s$/`, objIDMark, objIDMark)
 	qStr := qSelect + qWhere
 	resp, e := n3ic.cl.Query(influx.NewQuery(qStr, db, ""))
-	PE(e, resp.Error())
+	pe(e, resp.Error())
 	if len(resp.Results[0].Series) > 0 {
 		for _, v := range resp.Results[0].Series[0].Values {
 			// fPln("object count:", v[1])
-			return Must(v[1].(json.Number).Int64()).(int64)
+			return must(v[1].(json.Number).Int64()).(int64)
 		}
 	}
 	return 0

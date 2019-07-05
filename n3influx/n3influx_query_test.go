@@ -7,21 +7,21 @@ import (
 )
 
 func TestRootByID(t *testing.T) {
-	defer func() { PH(recover(), "./log.txt") }()
-	dbClient := Must(NewDBClient()).(*DBClient)
-	fPln(dbClient.RootByID("D3E34F41-9D75-101A-8C3D-00AA001A1656", "demo", " ~ "))
+	defer func() { ph(recover(), "./log.txt") }()
+	dbClient := must(NewDBClient()).(*DBClient)
+	fPln(dbClient.RootByID("00e6291b-884f-4fa2-92a1-bd477634be97", "demo", " ~ "))
 }
 
 func TestObjectCount(t *testing.T) {
-	defer func() { PH(recover(), "./log.txt") }()
-	dbClient := Must(NewDBClient()).(*DBClient)
+	defer func() { ph(recover(), "./log.txt") }()
+	dbClient := must(NewDBClient()).(*DBClient)
 	n := dbClient.ObjectCount("demo", "id")
 	fPln("object count:", n)
 }
 
 // func TestGetObjs(t *testing.T) {
 // 	defer func() { PH(recover(), "./log.txt") }()
-// 	dbClient := Must(NewDBClient()).(*DBClient)
+// 	dbClient := must(NewDBClient()).(*DBClient)
 
 // 	// tuple := &pb.SPOTuple{Subject: "D3E34F41-9D75-101A-8C3D-00AA001A1656", Predicate: "StaffPersonal"}
 // 	tuple := &pb.SPOTuple{Subject: "StaffPersonal", Predicate: "::"}
@@ -42,24 +42,24 @@ func TestObjectCount(t *testing.T) {
 // }
 
 func TestIDListByPathValue(t *testing.T) {
-	defer func() { PH(recover(), "./log.txt") }()
-	dbClient := Must(NewDBClient()).(*DBClient)
+	defer func() { ph(recover(), "./log.txt") }()
+	dbClient := must(NewDBClient()).(*DBClient)
 
 	tuple := &pb.SPOTuple{Predicate: "NIAS3 ~ actor ~ name", Object: "Lillian Simon"}
-	ids1 := dbClient.IDListByPathValue(tuple, "abc-xapi")
+	ids1 := dbClient.IDListByPathValue(tuple, "abc-xapi", false)
 	// for i, id := range ids1 {
 	// 	fPln(i, ":", id)
 	// }
 	// fPln(" ids1 ------------------------------------- ")
 
 	tuple = &pb.SPOTuple{Predicate: "NIAS3 ~ object ~ id", Object: "http://example.com/assignments/Geography-7-1-B:4"}
-	ids2 := dbClient.IDListByPathValue(tuple, "abc-xapi")
+	ids2 := dbClient.IDListByPathValue(tuple, "abc-xapi", false)
 	// for i, id := range ids2 {
 	// 	fPln(i, ":", id)
 	// }
 	// fPln(" ids2 ------------------------------------- ")
 
-	ids := IArrIntersect(Strs(ids1), Strs(ids2))
+	ids := IArrIntersect(Ss(ids1), Ss(ids2))
 	for i, id := range ids.([]string) {
 		fPln(i, ":", id)
 	}
