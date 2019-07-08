@@ -210,7 +210,7 @@ func (n3c *N3Node) startWriteHandler() error {
 	}
 
 	// set up handler for inbound messages
-	handler := func(n3msg *pb.N3Message) {
+	mHandler := func(n3msg *pb.N3Message) {
 
 		// force sender id to be this node
 		n3msg.SndId = n3c.pubKey
@@ -286,7 +286,8 @@ func (n3c *N3Node) startWriteHandler() error {
 				return
 			}
 		}
-	}
+
+	} // mHandler
 
 	// *** set up handler for query by inbound messages ***
 	qHandler := func(n3msg *pb.N3Message) (ts []*pb.SPOTuple) {
@@ -306,13 +307,14 @@ func (n3c *N3Node) startWriteHandler() error {
 
 		// fPf("Query : <%s> <%s> <%s> <%s>\n", s, p, o, ctx)
 
-		if s == "*" && p != "" && o != "" { //    *** subject ID List query (including deleted) ***
+		// *** <Object-ID List> query ***
+		if s == "*" && p != "" && o != "" { //    *** including deleted ***
 			for _, id := range dbClient.IDListByPathValue(tuple, ctx, false) {
 				ts = append(ts, &pb.SPOTuple{Subject: id, Predicate: p, Object: o})
 			}
 			return
 		}
-		if s == "" && p != "" && o != "" { //     *** subject ID List query ***
+		if s == "" && p != "" && o != "" { //     *** excluding deleted ***
 			for _, id := range dbClient.IDListByPathValue(tuple, ctx, false) {
 				if exist, alive := dbClient.Status(id, ctx); exist && alive {
 					ts = append(ts, &pb.SPOTuple{Subject: id, Predicate: p, Object: o})
@@ -321,25 +323,26 @@ func (n3c *N3Node) startWriteHandler() error {
 			return
 		}
 
+		// *** <Data> query; <SUBJECT> 's' must be ObjectID ***
 		switch p {
-		case "": //         *** root query ***
+		case "": //         *** <ROOT> ***
 			{
 				root := dbClient.RootByID(s, ctx, DELIPath)
 				ts = append(ts, &pb.SPOTuple{Subject: s, Predicate: "root", Object: root})
 			}
-		case "[]", "::": // *** array / struct query ***
+		case "[]", "::": // *** <ARRAY / STRUCT> ***
 			{
 				metaType := caseAssign(p, "::", "[]", "S", "A").(string)
 				if start, end, _ := getVerRange(dbClient, p+s, ctx, metaType); start >= 1 { // *** Meta file to check alive ***
 					root := dbClient.RootByID(s, ctx, DELIPath)
-					if ss, _, os, vs, ok := dbClient.GetObjsBySP(&pb.SPOTuple{Subject: root, Predicate: p + s}, ctx, true, false, start, end); ok {
+					if ss, _, os, vs, ok := dbClient.ObjsBySP(&pb.SPOTuple{Subject: root, Predicate: p + s}, ctx, true, false, start, end); ok {
 						for i := range ss {
 							ts = append(ts, &pb.SPOTuple{Subject: s, Predicate: ss[i], Object: os[i], Version: vs[i]})
 						}
 					}
 				}
 			}
-		default: //         *** values query ***
+		default: //         *** <VALUES> ***
 			{
 				metaType := ""
 				switch {
@@ -358,7 +361,7 @@ func (n3c *N3Node) startWriteHandler() error {
 					return
 				}
 
-				//                               *** GENERAL QUERY ***
+				//                            *** GENERAL QUERY ***
 				if start, end, _ := getVerRange(dbClient, s, ctx, metaType); start >= 1 { // *** Meta file to check alive ***
 					dbClient.QueryTuplesBySP(tuple, ctx, &ts, start, end)
 				}
@@ -366,7 +369,8 @@ func (n3c *N3Node) startWriteHandler() error {
 		}
 
 		return
-	}
+
+	} // qHandler
 
 	dHandler := func(n3msg *pb.N3Message) int { //      *** set up handler for delete by inbound messages ***
 		return 1234567 //                               *** DO NOT USE THIS TO DELETE, USE 'DEADMARK' IN PUB ***
@@ -374,7 +378,7 @@ func (n3c *N3Node) startWriteHandler() error {
 
 	// start server
 	apiServer := n3grpc.NewAPIServer()
-	apiServer.SetMessageHandler(handler, qHandler, dHandler)
+	apiServer.SetMessageHandler(mHandler, qHandler, dHandler)
 	return apiServer.Start(viper.GetInt("rpc_port"))
 }
 

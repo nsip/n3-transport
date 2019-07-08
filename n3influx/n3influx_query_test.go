@@ -80,3 +80,17 @@ func TestIDListByPathValue(t *testing.T) {
 // 		return false
 // 	}))
 // }
+
+func TestAllSubs(t *testing.T) {
+	defer func() { ph(recover(), "./log.txt") }()
+	dbClient := must(NewDBClient()).(*DBClient)
+
+	fPln(dbClient.AllSubs("ctxid"))
+}
+
+func TestLastPredObjByS(t *testing.T) {
+	defer func() { ph(recover(), "./log.txt") }()
+	dbClient := must(NewDBClient()).(*DBClient)
+
+	fPln(dbClient.LastPredObjByS("ctxid", "xapi111"))
+}
