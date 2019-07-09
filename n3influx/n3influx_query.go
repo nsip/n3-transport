@@ -86,21 +86,30 @@ func (n3ic *DBClient) IDListByPathValue(tuple *pb.SPOTuple, ctx string, caseSens
 	return
 }
 
-// AllSubs :
-func (n3ic *DBClient) AllSubs(ctx string) (subs []string) {
-	qStr := fSf(`SELECT distinct(subject) from (SELECT version, subject FROM "%s")`, ctx)
+// AllOneOfSPO :
+func (n3ic *DBClient) AllOneOfSPO(ctx, spo string) (rst []string) {
+	wanted := "subject"
+	switch spo {
+	case "subject", "sub", "s", "SUBJECT", "SUB", "S":
+		wanted = "subject"
+	case "predicate", "pred", "p", "PREDICATE", "PRED", "P":
+		wanted = "predicate"
+	case "object", "obj", "o", "OBJECT", "OBJ", "O":
+		wanted = "object"
+	}
+	qStr := fSf(`SELECT distinct(%s) from (SELECT version, %s FROM "%s")`, wanted, wanted, ctx)
 	resp, e := n3ic.cl.Query(influx.NewQuery(qStr, db, ""))
 	pe(e, resp.Error())
 	if len(resp.Results[0].Series) > 0 && len(resp.Results[0].Series[0].Values) > 0 {
 		for _, l := range resp.Results[0].Series[0].Values {
-			subs = append(subs, l[1].(string))
+			rst = append(rst, l[1].(string))
 		}
 	}
 	return
 }
 
-// LastPredObjByS :
-func (n3ic *DBClient) LastPredObjByS(ctx, sub string) (pred, obj string) {
+// LastPOByS :
+func (n3ic *DBClient) LastPOByS(ctx, sub string) (pred, obj string) {
 	qSelect := fSf(`SELECT predicate, object, version FROM "%s" `, ctx)
 	qWhere := fSf(`WHERE subject='%s' `, sub)
 	qStr := qSelect + qWhere + fSf(`ORDER BY %s DESC LIMIT 1`, orderByTm)
@@ -109,6 +118,25 @@ func (n3ic *DBClient) LastPredObjByS(ctx, sub string) (pred, obj string) {
 	if len(resp.Results[0].Series) > 0 && len(resp.Results[0].Series[0].Values) > 0 {
 		for _, l := range resp.Results[0].Series[0].Values {
 			return l[1].(string), l[2].(string)
+		}
+	}
+	return
+}
+
+// POsByS :
+func (n3ic *DBClient) POsByS(ctx, sub, predExcl, objExcl string) (preds, objs []string) {
+	qSelect := fSf(`SELECT predicate, object, version FROM "%s" `, ctx)
+	qWhere := fSf(`WHERE subject='%s' `, sub)
+	qStr := qSelect + qWhere + fSf(`ORDER BY %s DESC`, orderByTm)
+	resp, e := n3ic.cl.Query(influx.NewQuery(qStr, db, ""))
+	pe(e, resp.Error())
+	if len(resp.Results[0].Series) > 0 && len(resp.Results[0].Series[0].Values) > 0 {
+		for _, l := range resp.Results[0].Series[0].Values {
+			p, o := l[1].(string), l[2].(string)
+			if p != predExcl && o != objExcl {
+				preds = append(preds, p)
+				objs = append(objs, o)
+			}
 		}
 	}
 	return

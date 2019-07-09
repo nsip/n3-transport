@@ -81,16 +81,17 @@ func TestIDListByPathValue(t *testing.T) {
 // 	}))
 // }
 
-func TestAllSubs(t *testing.T) {
+func TestAllOneOfSPO(t *testing.T) {
 	defer func() { ph(recover(), "./log.txt") }()
 	dbClient := must(NewDBClient()).(*DBClient)
-
-	fPln(dbClient.AllSubs("ctxid"))
+	for _, r := range dbClient.AllOneOfSPO("ctxid", "s") {
+		// fPln(i, r)
+		fPln(dbClient.LastPOByS("ctxid", r))
+	}
 }
 
 func TestLastPredObjByS(t *testing.T) {
 	defer func() { ph(recover(), "./log.txt") }()
 	dbClient := must(NewDBClient()).(*DBClient)
-
-	fPln(dbClient.LastPredObjByS("ctxid", "xapi111"))
+	fPln(dbClient.POsByS("ctxid", "xapi", MARKDelID, ""))
 }

@@ -209,7 +209,11 @@ func (n3c *N3Node) startWriteHandler() error {
 		return errors.Wrap(err, "node closing: no dispatcher available.")
 	}
 
-	// set up handler for inbound messages
+	// *********************************************** //
+
+	// *********************************************** //
+
+	// set up handler for inbound messages [SPREAD]
 	mHandler := func(n3msg *pb.N3Message) {
 
 		// force sender id to be this node
@@ -222,32 +226,34 @@ func (n3c *N3Node) startWriteHandler() error {
 			return
 		}
 
+		s, p, _, ctx := tuple.Subject, tuple.Predicate, tuple.Object, n3msg.CtxName
+
 		// check authorisation
-		approvalScope := fmt.Sprintf("%s.%s.%s", n3msg.SndId, n3msg.NameSpace, n3msg.CtxName)
+		approvalScope := fmt.Sprintf("%s.%s.%s", n3msg.SndId, n3msg.NameSpace, ctx)
 		if !n3c.approved(approvalScope) {
-			log.Println("you are not authorised to send to context: ", n3msg.NameSpace, n3msg.CtxName)
+			log.Println("you are not authorised to send to context: ", n3msg.NameSpace, ctx)
 			return
 		}
 
 		// TODO: check privacy rules
 
 		// TODO: *** assign lamport clock version ***
-		tupleQueue, ctxQueue := []*pb.SPOTuple{tuple}, []string{n3msg.CtxName}
+		tupleQueue, ctxQueue := []*pb.SPOTuple{tuple}, []string{ctx}
 
-		if tuple.Predicate == MARKDead { //          *** Delete object ***
-			if exist, alive := dbClient.Status(tuple.Subject, n3msg.CtxName); exist && alive {
+		if p == MARKDead { //          *** Delete object ***
+			if exist, alive := dbClient.Status(s, ctx); exist && alive {
 				tupleQueue[0] = &pb.SPOTuple{
-					Subject:   tuple.Subject,
-					Predicate: tuple.Predicate,
-					Object:    time.Now().Format("2006-01-02 15:04:05"),
+					Subject:   s,
+					Predicate: p,
+					Object:    time.Now().Format("2006-01-02 15:04:05.000"),
 					Version:   999999,
 				}
-				ctxQueue[0] = S(n3msg.CtxName).MkSuffix("-meta").V()
+				ctxQueue[0] = S(ctx).MkSuffix("-meta").V()
 			} else {
 				return
 			}
 		} else {
-			if metaTuple, metaCtx := assignVer(dbClient, tuple, n3msg.CtxName); metaTuple != nil {
+			if metaTuple, metaCtx := assignVer(dbClient, tuple, ctx); metaTuple != nil {
 				// *** Save prevID's low-high version map into meta db as <"id" "V/S/A" "low-high"> ***
 				tupleQueue, ctxQueue = append(tupleQueue, metaTuple), append(ctxQueue, metaCtx)
 			}
@@ -295,17 +301,20 @@ func (n3c *N3Node) startWriteHandler() error {
 		// force sender id to be this node
 		n3msg.SndId = n3c.pubKey
 
+		tuple := must(messages.DecodeTuple(n3msg.Payload)).(*pb.SPOTuple)
+		s, p, o, ctx := tuple.Subject, tuple.Predicate, tuple.Object, n3msg.CtxName
+		// fPf("Query : <%s> <%s> <%s> <%s>\n", s, p, o, ctx)
+
 		// check authorisation
-		approvalScope := fmt.Sprintf("%s.%s.%s", n3msg.SndId, n3msg.NameSpace, n3msg.CtxName)
+		approvalScope := fmt.Sprintf("%s.%s.%s", n3msg.SndId, n3msg.NameSpace, ctx)
 		if !n3c.approved(approvalScope) {
-			log.Println("you are not authorised to query to context: ", n3msg.NameSpace, n3msg.CtxName)
+			log.Println("you are not authorised to query to context: ", n3msg.NameSpace, ctx)
 			return
 		}
 
-		tuple := must(messages.DecodeTuple(n3msg.Payload)).(*pb.SPOTuple)
-		s, p, o, ctx := tuple.Subject, tuple.Predicate, tuple.Object, n3msg.CtxName
+		// TODO: check privacy rules
+		
 
-		// fPf("Query : <%s> <%s> <%s> <%s>\n", s, p, o, ctx)
 
 		// *** <Object-ID List> query ***
 		if s == "*" && p != "" && o != "" { //    *** including deleted ***

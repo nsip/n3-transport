@@ -26,7 +26,7 @@ var cfgFile string
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "n3cli",
-	Short: "N3 Commnad Line Interface Tool",
+	Short: "N3 Transport Commnad Line Interface Tool",
 	Long:  `Allows user interaction with an n3 installation`,
 }
 

@@ -36,4 +36,5 @@ const (
 	orderByVer = "version" /* NOT supported */
 	orderByTm  = "time"    /* only ORDER BY time supported at this time */
 	MARKDead   = "TOMBSTONE"
+	MARKDelID  = "00000000-0000-0000-0000-000000000000"
 )
