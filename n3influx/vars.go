@@ -22,6 +22,7 @@ var (
 	IF   = u.IF
 
 	IArrIntersect = w.IArrIntersect
+	IArrEleIn     = w.IArrEleIn
 
 	fPf  = fmt.Printf
 	fSf  = fmt.Sprintf
@@ -29,11 +30,16 @@ var (
 	fEf  = fmt.Errorf
 
 	sSpl = strings.Split
+
+	SINDList = Ss([]string{"subject", "sub", "s", "SUBJECT", "SUB", "S"})
+	PINDList = Ss([]string{"predicate", "pred", "p", "PREDICATE", "PRED", "P"})
+	OINDList = Ss([]string{"object", "obj", "o", "OBJECT", "OBJ", "O"})
+	VINDList = Ss([]string{"version", "ver", "v", "VERSION", "VER", "V"})
 )
 
 const (
 	db         = "tuples"
-	orderByVer = "version" /* NOT supported */
+	orderByVer = "version" /* time NOT supported */
 	orderByTm  = "time"    /* only ORDER BY time supported at this time */
 	MARKDead   = "TOMBSTONE"
 	MARKDelID  = "00000000-0000-0000-0000-000000000000"

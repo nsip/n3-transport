@@ -235,12 +235,19 @@ func (n3c *N3Node) startWriteHandler() error {
 			return
 		}
 
+		tupleQueue, ctxQueue := []*pb.SPOTuple{tuple}, []string{ctx} // *** Queue : data/priv --> ctxid --> meta ***
+
+		// DOING : store privacy control file to <privctrl> & register it to <ctxid>
+		// if ctx == "privctrl" && S(p).Contains("#context") {
+		// 	ctxQueue = append(ctxQueue, "ctxid")
+		// 	tupleQueue = append(tupleQueue, &p)
+		// 	goto PUB
+		// }
+
 		// TODO: check privacy rules
 
-		// TODO: *** assign lamport clock version ***
-		tupleQueue, ctxQueue := []*pb.SPOTuple{tuple}, []string{ctx}
-
-		if p == MARKDead { //          *** Delete object ***
+		// DONE: *** assign tuple version ***
+		if p == MARKDead { //                                               *** Delete object ***
 			if exist, alive := dbClient.Status(s, ctx); exist && alive {
 				tupleQueue[0] = &pb.SPOTuple{
 					Subject:   s,
@@ -253,11 +260,13 @@ func (n3c *N3Node) startWriteHandler() error {
 				return
 			}
 		} else {
-			if metaTuple, metaCtx := assignVer(dbClient, tuple, ctx); metaTuple != nil {
-				// *** Save prevID's low-high version map into meta db as <"id" "V/S/A" "low-high"> ***
+			if metaTuple, metaCtx := assignVer(dbClient, tuple, ctx); metaTuple != nil { // *** Only at end of an whole object, can get metaTuple ***
+				// *** Store prevID's low-high version map into meta context as <"id" "V/S/A" "low-high"> ***
 				tupleQueue, ctxQueue = append(tupleQueue, metaTuple), append(ctxQueue, metaCtx)
 			}
 		}
+
+		// PUB:
 
 		for i := 0; i < len(tupleQueue); i++ {
 
@@ -312,10 +321,6 @@ func (n3c *N3Node) startWriteHandler() error {
 			return
 		}
 
-		// TODO: check privacy rules
-		
-
-
 		// *** <Object-ID List> query ***
 		if s == "*" && p != "" && o != "" { //    *** including deleted ***
 			for _, id := range dbClient.IDListByPathValue(tuple, ctx, false) {
@@ -341,10 +346,10 @@ func (n3c *N3Node) startWriteHandler() error {
 			}
 		case "[]", "::": // *** <ARRAY / STRUCT> ***
 			{
-				metaType := caseAssign(p, "::", "[]", "S", "A").(string)
+				metaType := matchAssign(p, "::", "[]", "S", "A").(string)
 				if start, end, _ := getVerRange(dbClient, p+s, ctx, metaType); start >= 1 { // *** Meta file to check alive ***
 					root := dbClient.RootByID(s, ctx, DELIPath)
-					if ss, _, os, vs, ok := dbClient.ObjsBySP(&pb.SPOTuple{Subject: root, Predicate: p + s}, ctx, true, false, start, end); ok {
+					if ss, _, os, vs, ok := dbClient.OsBySP(&pb.SPOTuple{Subject: root, Predicate: p + s}, ctx, true, false, start, end); ok {
 						for i := range ss {
 							ts = append(ts, &pb.SPOTuple{Subject: s, Predicate: ss[i], Object: os[i], Version: vs[i]})
 						}
@@ -353,17 +358,9 @@ func (n3c *N3Node) startWriteHandler() error {
 			}
 		default: //         *** <VALUES> ***
 			{
-				metaType := ""
-				switch {
-				case S(s).HP("::"):
-					metaType = "S"
-				case S(s).HP("[]"):
-					metaType = "A"
-				default:
-					metaType = "V"
-				}
+				metaType := conditionAssign(S(s).HP("::"), S(s).HP("[]"), "S", "A", "V").(string)
 
-				if S(ctx).HS("-meta") { //    *** REQUEST A TICKET ***
+				if S(ctx).HS("-meta") { //    *** REQUEST A TICKET FOR PUBLISH ***
 					if _, end, v := getVerRange(dbClient, s, ctx, metaType); end != -1 { // *** Meta file to check alive ***
 						return mkTicket(dbClient, ctx, s, end, v) //                        *** make a ticket for publishing, -1 means it's dead ***
 					}
@@ -372,7 +369,9 @@ func (n3c *N3Node) startWriteHandler() error {
 
 				//                            *** GENERAL QUERY ***
 				if start, end, _ := getVerRange(dbClient, s, ctx, metaType); start >= 1 { // *** Meta file to check alive ***
-					dbClient.QueryTuplesBySP(tuple, ctx, &ts, start, end)
+					dbClient.TuplesBySP(tuple, ctx, &ts, start, end)
+
+					// TODO: check privacy rules, modify [ts]
 				}
 			}
 		}

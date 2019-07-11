@@ -10,10 +10,11 @@ import (
 )
 
 var (
-	must       = u.Must
-	IF         = u.IF
-	caseAssign = u.CaseAssign
-	GoFn       = u.GoFn
+	must            = u.Must
+	IF              = u.IF
+	matchAssign     = u.MatchAssign
+	conditionAssign = u.ConditionAssign
+	GoFn            = u.GoFn
 
 	INum2Str = w.INum2Str
 

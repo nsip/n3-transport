@@ -81,17 +81,34 @@ func TestIDListByPathValue(t *testing.T) {
 // 	}))
 // }
 
-func TestAllOneOfSPO(t *testing.T) {
+func TestSingleListOfSPO(t *testing.T) {
 	defer func() { ph(recover(), "./log.txt") }()
 	dbClient := must(NewDBClient()).(*DBClient)
-	for _, r := range dbClient.AllOneOfSPO("ctxid", "s") {
-		// fPln(i, r)
+	for i, r := range dbClient.SingleListOfSPO("ctxid", "s") { // ****** should list all s-p pairs
+		fPln(i, r)
 		fPln(dbClient.LastPOByS("ctxid", r))
 	}
 }
 
-func TestLastPredObjByS(t *testing.T) {
+func TestLastPOByS(t *testing.T) {
 	defer func() { ph(recover(), "./log.txt") }()
 	dbClient := must(NewDBClient()).(*DBClient)
-	fPln(dbClient.POsByS("ctxid", "xapi", MARKDelID, ""))
+	fPln(dbClient.POsByS("ctxid", "xapi", "", MARKDelID))
+}
+
+func TestLastObySP(t *testing.T) {
+	defer func() { ph(recover(), "./log.txt") }()
+	dbClient := must(NewDBClient()).(*DBClient)
+	fPln(dbClient.LastOBySP("ctxid", "xapi", "demo1"))
+}
+
+func TestPairListOfSPO(t *testing.T) {
+	defer func() { ph(recover(), "./log.txt") }()
+	dbClient := must(NewDBClient()).(*DBClient)
+	rst1, rst2, rstLeft := dbClient.PairListOfSPO("ctxid", "O")
+	for i := 0; i < len(rst1); i++ {
+		if rstLeft[i] != MARKDelID {
+			fPln(rst1[i], rst2[i], rstLeft[i])
+		}
+	}
 }

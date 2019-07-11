@@ -8,7 +8,7 @@ import (
 
 func getVerRange(dbClient *n3influx.DBClient, objID string, ctx, metaType string) (start, end, ver int64) {
 	if exist, alive := dbClient.Status(objID, ctx); exist && alive {
-		o, v := dbClient.LastObjVer(&pb.SPOTuple{Subject: objID, Predicate: metaType}, S(ctx).MkSuffix("-meta").V())
+		o, v := dbClient.LastOV(&pb.SPOTuple{Subject: objID, Predicate: metaType}, S(ctx).MkSuffix("-meta").V())
 		if v != -1 {
 			ss := sSpl(o, "-")
 			start, end, ver = S(ss[0]).ToInt64(), S(ss[1]).ToInt64(), v
@@ -23,7 +23,7 @@ func getVerRange(dbClient *n3influx.DBClient, objID string, ctx, metaType string
 
 func mkMetaTuple(dbClient *n3influx.DBClient, ctx, id string, start, end int64, metaType string) (*pb.SPOTuple, string) {
 	ctxMeta := S(ctx).MkSuffix("-meta").V()
-	_, v := dbClient.LastObjVer(&pb.SPOTuple{Subject: id, Predicate: metaType}, ctxMeta)
+	_, v := dbClient.LastOV(&pb.SPOTuple{Subject: id, Predicate: metaType}, ctxMeta)
 	return &pb.SPOTuple{
 			Subject:   id,
 			Predicate: metaType,
