@@ -7,6 +7,28 @@ import (
 	"github.com/nsip/n3-messages/messages/pb"
 )
 
+// DbTblExists :
+func (n3ic *DBClient) DbTblExists(chkType, chkName string) bool {
+	if !IArrEleIn(chkType, Ss([]string{"databases", "DATABASES", "measurements", "MEASUREMENTS"})) {
+		fPln(chkType, ": error. 1st param can only be [databases] OR [measurements]")
+		return false
+	}
+
+	qStr := fSf(`show %s`, chkType)
+	resp, e := n3ic.cl.Query(influx.NewQuery(qStr, db, ""))
+	pe(e, resp.Error())
+	if len(resp.Results[0].Series) > 0 && len(resp.Results[0].Series[0].Values) > 0 {
+		allItems := resp.Results[0].Series[0].Values
+		for _, item := range allItems {
+			// fPln(item[0]) //               *** first field ***
+			if item[0] == chkName {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // TupleExists :
 func (n3ic *DBClient) TupleExists(tuple *pb.SPOTuple, ctx string, ignoreFields ...string) bool {
 	s, p, o, v := tuple.Subject, tuple.Predicate, tuple.Object, tuple.Version
@@ -155,8 +177,8 @@ func (n3ic *DBClient) SingleListOfSPO(ctx, spoIND string) (rst []string) {
 	return
 }
 
-// PairListOfSPO :
-func (n3ic *DBClient) PairListOfSPO(ctx, spoExcl string) (rst1, rst2, rstExcl []string) {
+// PairListOfSPO : get unique pairs' their own last remain value
+func (n3ic *DBClient) PairListOfSPO(ctx, spoExcl string) (rst1, rst2, rstRemain []string) {
 
 	r1, r2 := []string{}, []string{}
 	spoIND1, spoIND2 := "", ""
@@ -176,7 +198,7 @@ func (n3ic *DBClient) PairListOfSPO(ctx, spoExcl string) (rst1, rst2, rstExcl []
 	for _, i1 := range r1 {
 		for _, i2 := range r2 {
 			if r, ok := n3ic.PairOfSPOExists(ctx, i1, i2, spoIND1, spoIND2, -1, -1); ok {
-				rst1, rst2, rstExcl = append(rst1, i1), append(rst2, i2), append(rstExcl, r)
+				rst1, rst2, rstRemain = append(rst1, i1), append(rst2, i2), append(rstRemain, r)
 			}
 		}
 	}
@@ -185,7 +207,7 @@ func (n3ic *DBClient) PairListOfSPO(ctx, spoExcl string) (rst1, rst2, rstExcl []
 }
 
 // LastPOByS :
-func (n3ic *DBClient) LastPOByS(ctx, sub string) (pred, obj string) {
+func (n3ic *DBClient) LastPOByS(ctx, sub string) (p, o string) {
 	qSelect := fSf(`SELECT predicate, object, version FROM "%s" `, ctx)
 	qWhere := fSf(`WHERE subject='%s' `, sub)
 	qStr := qSelect + qWhere + fSf(`ORDER BY %s DESC LIMIT 1`, orderByTm)
@@ -200,7 +222,7 @@ func (n3ic *DBClient) LastPOByS(ctx, sub string) (pred, obj string) {
 }
 
 // POsByS :
-func (n3ic *DBClient) POsByS(ctx, sub, predExcl, objExcl string) (preds, objs []string) {
+func (n3ic *DBClient) POsByS(ctx, sub, predExcl, objExcl string) (Ps, Os []string) {
 	qSelect := fSf(`SELECT predicate, object, version FROM "%s" `, ctx)
 	qWhere := fSf(`WHERE subject='%s' `, sub)
 	qStr := qSelect + qWhere + fSf(`ORDER BY %s DESC`, orderByTm)
@@ -210,8 +232,8 @@ func (n3ic *DBClient) POsByS(ctx, sub, predExcl, objExcl string) (preds, objs []
 		for _, l := range resp.Results[0].Series[0].Values {
 			p, o := l[1].(string), l[2].(string)
 			if p != predExcl && o != objExcl {
-				preds = append(preds, p)
-				objs = append(objs, o)
+				Ps = append(Ps, p)
+				Os = append(Os, o)
 			}
 		}
 	}
@@ -234,7 +256,7 @@ func (n3ic *DBClient) LastOBySP(ctx, sub, pred string) string {
 }
 
 // OsBySP : (return objects, versions, IsFound)
-func (n3ic *DBClient) OsBySP(tuple *pb.SPOTuple, ctx string, extSub, extPred bool, vLow, vHigh int64) (subs, preds, objs []string, vers []int64, found bool) {
+func (n3ic *DBClient) OsBySP(tuple *pb.SPOTuple, ctx string, extSub, extPred bool, vLow, vHigh int64) (Ss, Ps, Os []string, Vs []int64, found bool) {
 
 	s, p := tuple.Subject, tuple.Predicate
 	vChkL := IF(vLow > 0, fSf(" AND version>=%d ", vLow), " AND version>0 ").(string)
@@ -258,8 +280,8 @@ func (n3ic *DBClient) OsBySP(tuple *pb.SPOTuple, ctx string, extSub, extPred boo
 	if len(resp.Results[0].Series) > 0 && len(resp.Results[0].Series[0].Values) > 0 {
 		for _, l := range resp.Results[0].Series[0].Values {
 			sub, pred, obj := l[1].(string), l[2].(string), l[3].(string)
-			subs, preds, objs = append(subs, sub), append(preds, pred), append(objs, obj)
-			vers = append(vers, must(l[4].(json.Number).Int64()).(int64))
+			Ss, Ps, Os = append(Ss, sub), append(Ps, pred), append(Os, obj)
+			Vs = append(Vs, must(l[4].(json.Number).Int64()).(int64))
 			// fPln(pred, obj, ver)
 		}
 		found = true

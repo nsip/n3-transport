@@ -209,9 +209,12 @@ func (n3c *N3Node) startWriteHandler() error {
 		return errors.Wrap(err, "node closing: no dispatcher available.")
 	}
 
-	// *********************************************** //
-
-	// *********************************************** //
+	// DONE : Fetch Privacy Control Rule
+	if dbClient.DbTblExists("databases", "tuples") &&
+		dbClient.DbTblExists("measurements", "ctxid") &&
+		dbClient.DbTblExists("measurements", "privctrl") {
+		pcObjCtxPathRW = mkPrivCtrl(dbClient)
+	}
 
 	// set up handler for inbound messages [SPREAD]
 	mHandler := func(n3msg *pb.N3Message) {
@@ -226,35 +229,50 @@ func (n3c *N3Node) startWriteHandler() error {
 			return
 		}
 
-		s, p, _, ctx := tuple.Subject, tuple.Predicate, tuple.Object, n3msg.CtxName
+		s, p, o, v, ctx := tuple.Subject, tuple.Predicate, tuple.Object, tuple.Version, n3msg.CtxName
+		root := sSpl(p, DELIPath)[0]
+		now := time.Now().Format("2006-01-02 15:04:05.000")
 
-		// check authorisation
+		// CHECK AUTHORISATION
 		approvalScope := fmt.Sprintf("%s.%s.%s", n3msg.SndId, n3msg.NameSpace, ctx)
 		if !n3c.approved(approvalScope) {
 			log.Println("you are not authorised to send to context: ", n3msg.NameSpace, ctx)
 			return
 		}
 
-		tupleQueue, ctxQueue := []*pb.SPOTuple{tuple}, []string{ctx} // *** Queue : data/priv --> ctxid --> meta ***
+		tupleQueue, ctxQueue := []*pb.SPOTuple{tuple}, []string{ctx} // *** Queue: 1.priv 2.ctxid || 1.data 2.meta ***
 
-		// DOING : store privacy control file to <privctrl> & register it to <ctxid>
-		// if ctx == "privctrl" && S(p).Contains("#context") {
-		// 	ctxQueue = append(ctxQueue, "ctxid")
-		// 	tupleQueue = append(tupleQueue, &p)
-		// 	goto PUB
-		// }
+		// DONE: STORE PRIVACY CONTROL FILE to <privctrl> & register it to <ctxid>
+		if ctx == "privctrl" {
+			if S(p).Contains("forcontext") { //                      *** register to ctxid ***
+				tupleQueue = append(tupleQueue, &pb.SPOTuple{Subject: root, Predicate: o, Object: s, Version: 0})
+				ctxQueue = append(ctxQueue, "ctxid")
+				goto PUB
+			}
+			if !S(s).IsUUID() || S(o).HP("::") || S(o).HP("[]") { // *** ignore unused tuples ***
+				return
+			}
+		}
 
-		// TODO: check privacy rules
-
-		// DONE: *** assign tuple version ***
-		if p == MARKDead { //                                               *** Delete object ***
-			if exist, alive := dbClient.Status(s, ctx); exist && alive {
-				tupleQueue[0] = &pb.SPOTuple{
-					Subject:   s,
-					Predicate: p,
-					Object:    time.Now().Format("2006-01-02 15:04:05.000"),
-					Version:   999999,
+		// DONE: CHECK PRIVACY RULES
+		if ctx != "privctrl" && ctx != "ctxid" {
+			if pcCtxPathCtrl, ok := pcObjCtxPathRW[root]; ok {
+				if pcPathCtrl, ok1 := pcCtxPathCtrl[ctx]; ok1 {
+					if ctrl, ok2 := pcPathCtrl[p]; ok2 {
+						switch ctrl {
+						case "R/W", "W/R", "W":
+						default:
+							tupleQueue[0] = &pb.SPOTuple{Subject: s, Predicate: p, Object: "...", Version: v}
+						}
+					}
 				}
+			}
+		}
+
+		// DONE: ASSIGN TUPLE VERSION
+		if p == MARKDead { //                                     *** Delete object ***
+			if exist, alive := dbClient.Status(s, ctx); exist && alive {
+				tupleQueue[0] = &pb.SPOTuple{Subject: s, Predicate: p, Object: now, Version: -1}
 				ctxQueue[0] = S(ctx).MkSuffix("-meta").V()
 			} else {
 				return
@@ -266,7 +284,7 @@ func (n3c *N3Node) startWriteHandler() error {
 			}
 		}
 
-		// PUB:
+	PUB:
 
 		for i := 0; i < len(tupleQueue); i++ {
 
@@ -449,10 +467,50 @@ func (n3c *N3Node) startReadHandler() error {
 			return
 		}
 
+		// DONE: *** update pcObjCtxPathRW at runtime ***
+		if n3msg.CtxName == "privctrl" {
+
+			_, p, o, _ := tuple.Subject, tuple.Predicate, tuple.Object, tuple.Version
+
+			forroot = IF(p != MARKTerm, sSpl(p, DELIPath)[0], forroot).(string)
+			forctx = IF(S(p).HS("forcontext"), o, forctx).(string)
+
+			if _, ok := pcObjCtxPathRW[forroot]; !ok {
+				//                                 context    path   rw
+				pcObjCtxPathRW[forroot] = make(map[string]map[string]string)
+			}
+			if _, ok := pcObjCtxPathRW[forroot][forctx]; !ok { //              *** forctx:  begin with "", then "ctx***" ***
+				//                                         path   rw
+				pcObjCtxPathRW[forroot][forctx] = make(map[string]string)
+			}
+
+			if p == MARKTerm {
+
+				// change forctx("")'s value back to its forctx("abc")'s related value
+				for path, rw := range pcObjCtxPathRW[forroot][""] {
+					pcObjCtxPathRW[forroot][forctx][path] = IF(forctx != "", rw, "error").(string)
+				}
+
+				forctx = ""
+				pcObjCtxPathRW[forroot][forctx] = make(map[string]string)
+
+			} else {
+				pcObjCtxPathRW[forroot][forctx][p] = o
+			}
+		}
+
+		// DOING: *** delete pcObjCtxPathRW at runtime ***
+		if n3msg.CtxName == "ctxid" {
+			if s, p, o := tuple.Subject, tuple.Predicate, tuple.Object; o == MARKDelID && pcObjCtxPathRW[s] != nil {
+				//                              path   rw
+				pcObjCtxPathRW[s][p] = make(map[string]string)
+			}
+		}
+
 		// *** exclude "legend liftbridge data" ***
-		// if inDB(pub, tuple, n3msg.CtxName) {
-		// 	return
-		// }
+		if inDB(pub, n3msg.CtxName, tuple) {
+			return
+		}
 
 		err = pub.StoreTuple(tuple, n3msg.CtxName)
 		if err != nil {
@@ -461,7 +519,6 @@ func (n3c *N3Node) startReadHandler() error {
 		}
 		// log.Println("...tuple stored successfully.")
 		lastMessageOffset = msg.Offset
-
 	}
 
 	// create context to control async subscription

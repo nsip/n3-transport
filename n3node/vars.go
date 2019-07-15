@@ -11,12 +11,14 @@ import (
 
 var (
 	must            = u.Must
+	ph              = u.PH
 	IF              = u.IF
 	matchAssign     = u.MatchAssign
 	conditionAssign = u.ConditionAssign
 	GoFn            = u.GoFn
 
-	INum2Str = w.INum2Str
+	INum2Str  = w.INum2Str
+	IArrEleIn = w.IArrEleIn
 
 	fPln = fmt.Println
 	fPf  = fmt.Printf
@@ -36,6 +38,11 @@ var (
 	mIDsQueue = make(map[string][]int64)
 	mIDaQueue = make(map[string][]int64)
 	mTickets  = syncmap.Map{}
+
+	//                        object     context    path   R/W
+	pcObjCtxPathRW = make(map[string]map[string]map[string]string) // map[string]map[string]map[string]string
+	forroot        = ""
+	forctx         = ""
 )
 
 type (
@@ -52,14 +59,16 @@ type (
 	}
 
 	S   = w.Str
+	Ss  = w.Strs
 	I64 = w.I64
 )
 
 const (
 	MARKDead      = "TOMBSTONE"
-	MARKTerm      = "--------------------------------------"
+	MARKTerm      = "--------------------------------------" // len(uuid) + 2 : 38
 	DELIPath      = " ~ "
 	DELIChild     = " + "
+	MARKDelID     = "00000000-0000-0000-0000-000000000000"
 	DELAY_CONTEST = 2000
 	DELAY_CHKTERM = 5000
 )

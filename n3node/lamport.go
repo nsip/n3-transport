@@ -108,6 +108,21 @@ func assignVer(dbClient *n3influx.DBClient, tuple *pb.SPOTuple, ctx string) (met
 	return
 }
 
+func inDB(dbClient *n3influx.DBClient, ctx string, tuple *pb.SPOTuple) bool {
+	if dbClient.TupleExists(tuple, ctx) {
+		return true
+	}
+
+	switch {
+	case IArrEleIn(ctx, Ss([]string{"ctxid", "privctrl"})):
+		return false
+	case S(ctx).HS("-meta"):
+		return false
+	default:
+		return false
+	}
+}
+
 // inDB : before db storing, if Object is "deleted", it's not inDB
 // func inDB(dbClient *n3influx.DBClient, tuple *pb.SPOTuple, ctx string) bool {
 // 	s, p, _, v := tuple.Subject, tuple.Predicate, tuple.Object, tuple.Version

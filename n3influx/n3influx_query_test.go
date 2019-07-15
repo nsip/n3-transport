@@ -6,6 +6,12 @@ import (
 	"github.com/nsip/n3-messages/messages/pb"
 )
 
+func TestDbTblExists(t *testing.T) {
+	defer func() { ph(recover(), "./log.txt") }()
+	dbClient := must(NewDBClient()).(*DBClient)
+	fPln(dbClient.DbTblExists("measurements", "ctxid"))
+}
+
 func TestRootByID(t *testing.T) {
 	defer func() { ph(recover(), "./log.txt") }()
 	dbClient := must(NewDBClient()).(*DBClient)
