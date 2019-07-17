@@ -533,9 +533,8 @@ func (n3c *N3Node) startReadHandler() error {
 
 		// DONE: PRIVACY *** delete pcObjCtxPathRW at runtime ***
 		if n3msg.CtxName == "ctxid" {
-			if s, p, o := tuple.Subject, tuple.Predicate, tuple.Object; o == MARKDelID && pcObjCtxPathRW[s] != nil {
-				//                              path   rw
-				pcObjCtxPathRW[s][p] = make(map[string]string)
+			if s, p, o := tuple.Subject, tuple.Predicate, tuple.Object; o == MARKDelID && pcObjCtxPathRW[s] != nil {				
+				delete(pcObjCtxPathRW[s], p)
 			}
 		}
 
