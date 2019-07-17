@@ -15,7 +15,7 @@ func TestDbTblExists(t *testing.T) {
 func TestRootByID(t *testing.T) {
 	defer func() { ph(recover(), "./log.txt") }()
 	dbClient := must(NewDBClient()).(*DBClient)
-	fPln(dbClient.RootByID("00e6291b-884f-4fa2-92a1-bd477634be97", "demo", " ~ "))
+	fPln(dbClient.RootByID("demo", "00e6291b-884f-4fa2-92a1-bd477634be97", " ~ "))
 }
 
 func TestObjectCount(t *testing.T) {
@@ -46,6 +46,17 @@ func TestObjectCount(t *testing.T) {
 // 	}
 // 	time.Sleep(20 * time.Millisecond)
 // }
+
+func TestIDListByRoot(t *testing.T) {
+	defer func() { ph(recover(), "./log.txt") }()
+	dbClient := must(NewDBClient()).(*DBClient)
+
+	ids := dbClient.IDListByRoot("demo", "xapi")
+	for i, id := range ids {
+		fPln(i, ":", id)
+	}
+	fPln(" ids ------------------------------------- ")
+}
 
 func TestIDListByPathValue(t *testing.T) {
 	defer func() { ph(recover(), "./log.txt") }()

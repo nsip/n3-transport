@@ -242,7 +242,7 @@ func (n3c *N3Node) startWriteHandler() error {
 
 		tupleQueue, ctxQueue := []*pb.SPOTuple{tuple}, []string{ctx} // *** Queue: 1.priv 2.ctxid || 1.data 2.meta ***
 
-		// DONE: STORE PRIVACY CONTROL FILE to <privctrl> & register it to <ctxid>
+		// DONE: PRIVACY, STORE PRIVACY CONTROL FILE to <privctrl> & register it to <ctxid>
 		if ctx == "privctrl" {
 			if S(p).Contains("forcontext") { //                      *** register to ctxid ***
 				tupleQueue = append(tupleQueue, &pb.SPOTuple{Subject: root, Predicate: o, Object: s, Version: 0})
@@ -254,15 +254,16 @@ func (n3c *N3Node) startWriteHandler() error {
 			}
 		}
 
-		// DONE: CHECK PRIVACY RULES
+		// DONE: PRIVACY, CHECK PRIVACY RULES
 		if ctx != "privctrl" && ctx != "ctxid" {
 			if pcCtxPathCtrl, ok := pcObjCtxPathRW[root]; ok {
 				if pcPathCtrl, ok1 := pcCtxPathCtrl[ctx]; ok1 {
 					if ctrl, ok2 := pcPathCtrl[p]; ok2 {
-						switch ctrl {
-						case "R/W", "W/R", "W":
+						switch {
+						case IArrEleIn(ctrl, Ss([]string{"R/W", "W/R", "RW", "WR", "W"})):
+						case S(ctrl).IsUUID():
 						default:
-							tupleQueue[0] = &pb.SPOTuple{Subject: s, Predicate: p, Object: "...", Version: v}
+							tupleQueue[0] = &pb.SPOTuple{Subject: s, Predicate: p, Object: NOWRITE, Version: v}
 						}
 					}
 				}
@@ -271,7 +272,7 @@ func (n3c *N3Node) startWriteHandler() error {
 
 		// DONE: ASSIGN TUPLE VERSION
 		if p == MARKDead { //                                     *** Delete object ***
-			if exist, alive := dbClient.Status(s, ctx); exist && alive {
+			if exist, alive := dbClient.Status(ctx, s); exist && alive {
 				tupleQueue[0] = &pb.SPOTuple{Subject: s, Predicate: p, Object: now, Version: -1}
 				ctxQueue[0] = S(ctx).MkSuffix("-meta").V()
 			} else {
@@ -339,17 +340,27 @@ func (n3c *N3Node) startWriteHandler() error {
 			return
 		}
 
-		// *** <Object-ID List> query ***
-		if s == "*" && p != "" && o != "" { //    *** including deleted ***
-			for _, id := range dbClient.IDListByPathValue(tuple, ctx, false) {
-				ts = append(ts, &pb.SPOTuple{Subject: id, Predicate: p, Object: o})
+		// *** <ObjectID List> query ***
+		if (s == "*" || s == "") && p != "" && o != "" {
+
+			var IDs []string
+
+			switch {
+			case S(p).Contains(DELIPath): //                                            *** objectIDs by path-value ***
+				IDs = dbClient.IDListByPathValue(ctx, tuple, false)
+			case IArrEleIn(p, Ss([]string{"root", "ROOT", "Root"})): //                 *** objectIDs by root name ***
+				IDs = dbClient.IDListByRoot(ctx, o)
 			}
-			return
-		}
-		if s == "" && p != "" && o != "" { //     *** excluding deleted ***
-			for _, id := range dbClient.IDListByPathValue(tuple, ctx, false) {
-				if exist, alive := dbClient.Status(id, ctx); exist && alive {
-					ts = append(ts, &pb.SPOTuple{Subject: id, Predicate: p, Object: o})
+
+			if IDs != nil {
+				for _, id := range IArrRmRep(Ss(IDs)).([]string) {
+					if s == "*" { //                                                        *** including deleted ***
+						ts = append(ts, &pb.SPOTuple{Subject: id, Predicate: p, Object: o})
+					} else { //                                                             *** excluding deleted ***
+						if exist, alive := dbClient.Status(ctx, id); exist && alive {
+							ts = append(ts, &pb.SPOTuple{Subject: id, Predicate: p, Object: o})
+						}
+					}
 				}
 			}
 			return
@@ -359,15 +370,15 @@ func (n3c *N3Node) startWriteHandler() error {
 		switch p {
 		case "": //         *** <ROOT> ***
 			{
-				root := dbClient.RootByID(s, ctx, DELIPath)
+				root := dbClient.RootByID(ctx, s, DELIPath)
 				ts = append(ts, &pb.SPOTuple{Subject: s, Predicate: "root", Object: root})
 			}
 		case "[]", "::": // *** <ARRAY / STRUCT> ***
 			{
 				metaType := matchAssign(p, "::", "[]", "S", "A").(string)
 				if start, end, _ := getVerRange(dbClient, p+s, ctx, metaType); start >= 1 { // *** Meta file to check alive ***
-					root := dbClient.RootByID(s, ctx, DELIPath)
-					if ss, _, os, vs, ok := dbClient.OsBySP(&pb.SPOTuple{Subject: root, Predicate: p + s}, ctx, true, false, start, end); ok {
+					root := dbClient.RootByID(ctx, s, DELIPath)
+					if ss, _, os, vs, ok := dbClient.OsBySP(ctx, &pb.SPOTuple{Subject: root, Predicate: p + s}, true, false, start, end); ok {
 						for i := range ss {
 							ts = append(ts, &pb.SPOTuple{Subject: s, Predicate: ss[i], Object: os[i], Version: vs[i]})
 						}
@@ -387,15 +398,36 @@ func (n3c *N3Node) startWriteHandler() error {
 
 				//                            *** GENERAL QUERY ***
 				if start, end, _ := getVerRange(dbClient, s, ctx, metaType); start >= 1 { // *** Meta file to check alive ***
-					dbClient.TuplesBySP(tuple, ctx, &ts, start, end)
 
-					// TODO: check privacy rules, modify [ts]
+					fPln("*** GENERAL QUERY ***")
+
+					// Fetch all tuples [ts]
+					dbClient.TuplesBySP(ctx, tuple, &ts, start, end)
+
+					// DONE: PRIVACY, check privacy rules, modify [ts]
+					if !IArrEleIn(ctx, Ss([]string{"ctxid", "privctrl"})) && !S(ctx).HS("meta") {
+						for _, pt := range ts {
+							if S(pt.Subject).IsUUID() && S(pt.Predicate) != MARKTerm {
+								root := sSpl(pt.Predicate, DELIPath)[0]
+								if pcCtxPathRW, ok1 := pcObjCtxPathRW[root]; ok1 {
+									if pcPathRW, ok2 := pcCtxPathRW[ctx]; ok2 { //       *** has rules ***
+										// fPln("DEBUG", pt.Predicate, pcPathRW[pt.Predicate])
+										switch {
+										case S(pcPathRW[pt.Predicate]).IsUUID():
+											continue
+										case !IArrEleIn(pcPathRW[pt.Predicate], Ss([]string{"R/W", "R", "RW", "WR"})):
+											pt.Object = NOREAD
+										}
+									}
+								}
+							}
+						}
+					}
 				}
 			}
 		}
 
 		return
-
 	} // qHandler
 
 	dHandler := func(n3msg *pb.N3Message) int { //      *** set up handler for delete by inbound messages ***
@@ -467,7 +499,7 @@ func (n3c *N3Node) startReadHandler() error {
 			return
 		}
 
-		// DONE: *** update pcObjCtxPathRW at runtime ***
+		// DONE: PRIVACY *** update pcObjCtxPathRW at runtime ***
 		if n3msg.CtxName == "privctrl" {
 
 			_, p, o, _ := tuple.Subject, tuple.Predicate, tuple.Object, tuple.Version
@@ -499,7 +531,7 @@ func (n3c *N3Node) startReadHandler() error {
 			}
 		}
 
-		// DOING: *** delete pcObjCtxPathRW at runtime ***
+		// DONE: PRIVACY *** delete pcObjCtxPathRW at runtime ***
 		if n3msg.CtxName == "ctxid" {
 			if s, p, o := tuple.Subject, tuple.Predicate, tuple.Object; o == MARKDelID && pcObjCtxPathRW[s] != nil {
 				//                              path   rw

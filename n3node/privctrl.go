@@ -54,7 +54,10 @@ func mkPrivCtrl(dbClt *n3influx.DBClient) (ObjCtxPathCtrl map[string]map[string]
 				ObjCtxPathCtrl[object][ctx] = make(map[string]string)
 			}
 
-			Ps, Os := dbClt.POsByS("privctrl", ID, "", "")
+			verstrs := sSpl(dbClt.LastOBySP("privctrl-meta", ID, "V"), "-")
+			vlow, vhigh := S(verstrs[0]).ToInt64(), S(verstrs[1]).ToInt64()
+			fPln(vlow, vhigh)
+			Ps, Os := dbClt.POsByS("privctrl", ID, "", "", vlow, vhigh)
 			for i := 0; i < len(Ps); i++ {
 				ObjCtxPathCtrl[object][ctx][Ps[i]] = Os[i]
 			}

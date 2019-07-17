@@ -19,6 +19,7 @@ var (
 
 	INum2Str  = w.INum2Str
 	IArrEleIn = w.IArrEleIn
+	IArrRmRep = w.IArrRmRep
 
 	fPln = fmt.Println
 	fPf  = fmt.Printf
@@ -71,4 +72,6 @@ const (
 	MARKDelID     = "00000000-0000-0000-0000-000000000000"
 	DELAY_CONTEST = 2000
 	DELAY_CHKTERM = 5000
+	NOREAD        = "******"
+	NOWRITE       = "------"
 )

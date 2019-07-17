@@ -30,7 +30,7 @@ func (n3ic *DBClient) DbTblExists(chkType, chkName string) bool {
 }
 
 // TupleExists :
-func (n3ic *DBClient) TupleExists(tuple *pb.SPOTuple, ctx string, ignoreFields ...string) bool {
+func (n3ic *DBClient) TupleExists(ctx string, tuple *pb.SPOTuple, ignoreFields ...string) bool {
 	s, p, o, v := tuple.Subject, tuple.Predicate, tuple.Object, tuple.Version
 
 	qSelect := fSf(`SELECT version, subject, predicate, object FROM "%s" `, ctx)
@@ -124,7 +124,7 @@ func (n3ic *DBClient) OneOfSPOExists(ctx, spo, spoIND string, vLow, vHigh int64)
 }
 
 // RootByID :
-func (n3ic *DBClient) RootByID(objID, ctx, del string) string {
+func (n3ic *DBClient) RootByID(ctx, objID, del string) string {
 	if !S(ctx).HS("-meta") && S(objID).IsUUID() {
 		if p, _, ok := n3ic.OneOfSPOExists(ctx, objID, "S", -1, -1); ok && S(p).Contains(del) {
 			return sSpl(p, del)[0]
@@ -133,13 +133,27 @@ func (n3ic *DBClient) RootByID(objID, ctx, del string) string {
 	return ""
 }
 
+// IDListByRoot :
+func (n3ic *DBClient) IDListByRoot(ctx, root string) (ids []string) {
+	subs := n3ic.SingleListOfSPO(ctx, "S")
+	for _, s := range subs {
+		p, _ := n3ic.LastPOByS(ctx, s)
+		if S(p).HP(root + DELIPath) {
+			ids = append(ids, s)
+		}
+	}
+	return
+}
+
 // IDListByPathValue :
-func (n3ic *DBClient) IDListByPathValue(tuple *pb.SPOTuple, ctx string, caseSensitive bool) (ids []string) {
+func (n3ic *DBClient) IDListByPathValue(ctx string, tuple *pb.SPOTuple, caseSensitive bool) (ids []string) {
+	_, p, o := tuple.Subject, tuple.Predicate, tuple.Object
+
 	qSelect := fSf(`SELECT version, subject FROM "%s" `, ctx)
-	qWhere := fSf(`WHERE predicate='%s' AND object='%s' `, tuple.Predicate, tuple.Object)
+	qWhere := fSf(`WHERE predicate='%s' AND object='%s' `, p, o)
 	if !caseSensitive {
-		objRegex := regex4CaseIns(tuple.Object)
-		qWhere = fSf(`WHERE predicate='%s' AND object=~/%s/`, tuple.Predicate, objRegex)
+		objRegex := regex4CaseIns(o)
+		qWhere = fSf(`WHERE predicate='%s' AND object=~/%s/`, p, objRegex)
 	}
 	qStr := qSelect + qWhere + fSf(`ORDER BY %s`, orderByTm)
 	resp, e := n3ic.cl.Query(influx.NewQuery(qStr, db, ""))
@@ -222,9 +236,11 @@ func (n3ic *DBClient) LastPOByS(ctx, sub string) (p, o string) {
 }
 
 // POsByS :
-func (n3ic *DBClient) POsByS(ctx, sub, predExcl, objExcl string) (Ps, Os []string) {
+func (n3ic *DBClient) POsByS(ctx, sub, predExcl, objExcl string, vLow, vHigh int64) (Ps, Os []string) {
+	vChkL := IF(vLow > 0, fSf(" AND version>=%d ", vLow), " AND version>0 ").(string)
+	vChkH := IF(vHigh > 0, fSf(" AND version<=%d ", vHigh), "").(string)
 	qSelect := fSf(`SELECT predicate, object, version FROM "%s" `, ctx)
-	qWhere := fSf(`WHERE subject='%s' `, sub)
+	qWhere := fSf(`WHERE subject='%s' `, sub) + vChkL + vChkH
 	qStr := qSelect + qWhere + fSf(`ORDER BY %s DESC`, orderByTm)
 	resp, e := n3ic.cl.Query(influx.NewQuery(qStr, db, ""))
 	pe(e, resp.Error())
@@ -232,8 +248,7 @@ func (n3ic *DBClient) POsByS(ctx, sub, predExcl, objExcl string) (Ps, Os []strin
 		for _, l := range resp.Results[0].Series[0].Values {
 			p, o := l[1].(string), l[2].(string)
 			if p != predExcl && o != objExcl {
-				Ps = append(Ps, p)
-				Os = append(Os, o)
+				Ps, Os = append(Ps, p), append(Os, o)
 			}
 		}
 	}
@@ -256,12 +271,11 @@ func (n3ic *DBClient) LastOBySP(ctx, sub, pred string) string {
 }
 
 // OsBySP : (return objects, versions, IsFound)
-func (n3ic *DBClient) OsBySP(tuple *pb.SPOTuple, ctx string, extSub, extPred bool, vLow, vHigh int64) (Ss, Ps, Os []string, Vs []int64, found bool) {
+func (n3ic *DBClient) OsBySP(ctx string, tuple *pb.SPOTuple, extSub, extPred bool, vLow, vHigh int64) (Ss, Ps, Os []string, Vs []int64, found bool) {
 
 	s, p := tuple.Subject, tuple.Predicate
 	vChkL := IF(vLow > 0, fSf(" AND version>=%d ", vLow), " AND version>0 ").(string)
 	vChkH := IF(vHigh > 0, fSf(" AND version<=%d ", vHigh), "").(string)
-
 	qSelect, qWhere := fSf(`SELECT subject, predicate, object, version FROM "%s" `, ctx), ""
 	if extSub && !extPred {
 		qWhere = fSf(`WHERE subject=~/^%s/ AND predicate='%s' `+vChkL+vChkH, s, p)
@@ -290,13 +304,14 @@ func (n3ic *DBClient) OsBySP(tuple *pb.SPOTuple, ctx string, extSub, extPred boo
 }
 
 // TuplesBySP :
-func (n3ic *DBClient) TuplesBySP(tuple *pb.SPOTuple, ctx string, ts *[]*pb.SPOTuple, vLow, vHigh int64) {
-	_, _, exist := n3ic.OneOfSPOExists(ctx, tuple.Subject, "S", vLow, vHigh)
+func (n3ic *DBClient) TuplesBySP(ctx string, tuple *pb.SPOTuple, ts *[]*pb.SPOTuple, vLow, vHigh int64) {
+	s, _, _ := tuple.Subject, tuple.Predicate, tuple.Object
+	_, _, exist := n3ic.OneOfSPOExists(ctx, s, "S", vLow, vHigh)
 	if !exist {
 		// fPln("subject does not exist !")
 		return
 	}
-	if subs, preds, objs, vers, ok := n3ic.OsBySP(tuple, ctx, false, true, vLow, vHigh); ok {
+	if subs, preds, objs, vers, ok := n3ic.OsBySP(ctx, tuple, false, true, vLow, vHigh); ok {
 		for i := range subs {
 			*ts = append(*ts, &pb.SPOTuple{
 				Subject:   subs[i],
@@ -309,15 +324,15 @@ func (n3ic *DBClient) TuplesBySP(tuple *pb.SPOTuple, ctx string, ts *[]*pb.SPOTu
 }
 
 // LastOV : we assume the return is unique, so use "fast" way to get the result
-func (n3ic *DBClient) LastOV(tuple *pb.SPOTuple, ctx string) (string, int64) {
-	if _, _, objs, vers, found := n3ic.OsBySP(tuple, ctx, false, false, 0, 0); found {
+func (n3ic *DBClient) LastOV(ctx string, tuple *pb.SPOTuple) (string, int64) {
+	if _, _, objs, vers, found := n3ic.OsBySP(ctx, tuple, false, false, 0, 0); found {
 		return objs[0], vers[0]
 	}
 	return "", -1
 }
 
 // Status :
-func (n3ic *DBClient) Status(ObjID, ctx string) (exist, alive bool) {
+func (n3ic *DBClient) Status(ctx, ObjID string) (exist, alive bool) {
 	ctx = S(ctx).MkSuffix("-meta").V()
 	ObjID = S(ObjID).RmPrefix("::").V()
 	ObjID = S(ObjID).RmPrefix("[]").V()

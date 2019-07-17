@@ -7,8 +7,9 @@ import (
 )
 
 func getVerRange(dbClient *n3influx.DBClient, objID string, ctx, metaType string) (start, end, ver int64) {
-	if exist, alive := dbClient.Status(objID, ctx); exist && alive {
-		o, v := dbClient.LastOV(&pb.SPOTuple{Subject: objID, Predicate: metaType}, S(ctx).MkSuffix("-meta").V())
+	if exist, alive := dbClient.Status(ctx, objID); exist && alive {
+		ctxMeta := S(ctx).MkSuffix("-meta").V()
+		o, v := dbClient.LastOV(ctxMeta, &pb.SPOTuple{Subject: objID, Predicate: metaType})
 		if v != -1 {
 			ss := sSpl(o, "-")
 			start, end, ver = S(ss[0]).ToInt64(), S(ss[1]).ToInt64(), v
@@ -23,7 +24,7 @@ func getVerRange(dbClient *n3influx.DBClient, objID string, ctx, metaType string
 
 func mkMetaTuple(dbClient *n3influx.DBClient, ctx, id string, start, end int64, metaType string) (*pb.SPOTuple, string) {
 	ctxMeta := S(ctx).MkSuffix("-meta").V()
-	_, v := dbClient.LastOV(&pb.SPOTuple{Subject: id, Predicate: metaType}, ctxMeta)
+	_, v := dbClient.LastOV(ctxMeta, &pb.SPOTuple{Subject: id, Predicate: metaType})
 	return &pb.SPOTuple{
 			Subject:   id,
 			Predicate: metaType,
@@ -109,7 +110,7 @@ func assignVer(dbClient *n3influx.DBClient, tuple *pb.SPOTuple, ctx string) (met
 }
 
 func inDB(dbClient *n3influx.DBClient, ctx string, tuple *pb.SPOTuple) bool {
-	if dbClient.TupleExists(tuple, ctx) {
+	if dbClient.TupleExists(ctx, tuple) {
 		return true
 	}
 
@@ -142,12 +143,12 @@ func inDB(dbClient *n3influx.DBClient, ctx string, tuple *pb.SPOTuple) bool {
 // 				return true
 // 			}
 // 		} else { //                                                                       *** MARKTerm ***
-// 			return dbClient.TupleExists(tuple, ctx, "Subject")
+// 			return dbClient.TupleExists(ctx, tuple, "Subject")
 // 		}
 
 // 	} else { //                                                                           *** META TABLE ***
 
-// 		return dbClient.TupleExists(tuple, ctx)
+// 		return dbClient.TupleExists(ctx, tuple)
 // 	}
 
 // 	return false
