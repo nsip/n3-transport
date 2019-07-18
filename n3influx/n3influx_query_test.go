@@ -12,6 +12,12 @@ func TestDbTblExists(t *testing.T) {
 	fPln(dbClient.DbTblExists("measurements", "ctxid"))
 }
 
+func TestLatestVer(t *testing.T) {
+	defer func() { ph(recover(), "./log.txt") }()
+	dbClient := must(NewDBClient()).(*DBClient)
+	fPln(dbClient.LatestVer("ctxid"))
+}
+
 func TestRootByID(t *testing.T) {
 	defer func() { ph(recover(), "./log.txt") }()
 	dbClient := must(NewDBClient()).(*DBClient)
@@ -63,14 +69,14 @@ func TestIDListByPathValue(t *testing.T) {
 	dbClient := must(NewDBClient()).(*DBClient)
 
 	tuple := &pb.SPOTuple{Predicate: "NIAS3 ~ actor ~ name", Object: "Lillian Simon"}
-	ids1 := dbClient.IDListByPathValue(tuple, "abc-xapi", false)
+	ids1 := dbClient.IDListByPathValue("abc-xapi", tuple, false)
 	// for i, id := range ids1 {
 	// 	fPln(i, ":", id)
 	// }
 	// fPln(" ids1 ------------------------------------- ")
 
 	tuple = &pb.SPOTuple{Predicate: "NIAS3 ~ object ~ id", Object: "http://example.com/assignments/Geography-7-1-B:4"}
-	ids2 := dbClient.IDListByPathValue(tuple, "abc-xapi", false)
+	ids2 := dbClient.IDListByPathValue("abc-xapi", tuple, false)
 	// for i, id := range ids2 {
 	// 	fPln(i, ":", id)
 	// }
@@ -110,13 +116,13 @@ func TestSingleListOfSPO(t *testing.T) {
 func TestLastPOByS(t *testing.T) {
 	defer func() { ph(recover(), "./log.txt") }()
 	dbClient := must(NewDBClient()).(*DBClient)
-	fPln(dbClient.POsByS("ctxid", "xapi", "", MARKDelID))
+	fPln(dbClient.POsByS("ctxid", "xapi", "", MARKDelID, 0, 0))
 }
 
 func TestLastObySP(t *testing.T) {
 	defer func() { ph(recover(), "./log.txt") }()
 	dbClient := must(NewDBClient()).(*DBClient)
-	fPln(dbClient.LastOBySP("ctxid", "xapi", "demo1"))
+	fPln(dbClient.LastOBySP("ctxid", "xapi", "demo"))
 }
 
 func TestPairListOfSPO(t *testing.T) {

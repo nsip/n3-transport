@@ -57,6 +57,19 @@ func (n3ic *DBClient) TupleExists(ctx string, tuple *pb.SPOTuple, ignoreFields .
 	return len(resp.Results[0].Series) > 0 && len(resp.Results[0].Series[0].Values) > 0
 }
 
+// LatestVer :
+func (n3ic *DBClient) LatestVer(ctx string) int64 {
+	qSelect := fSf(`SELECT version FROM "%s" `, ctx)
+	qStr := qSelect + fSf(`ORDER BY %s DESC LIMIT 1`, orderByTm)
+	resp, e := n3ic.cl.Query(influx.NewQuery(qStr, db, ""))
+	pe(e, resp.Error())
+	if len(resp.Results[0].Series) > 0 && len(resp.Results[0].Series[0].Values) > 0 {
+		lastItem := resp.Results[0].Series[0].Values[0]
+		return must(lastItem[1].(json.Number).Int64()).(int64)
+	}
+	return 0
+}
+
 // PairOfSPOExists : spoIND1 -> "s", "p"; spoIND2 -> "p", "o". if exists, get the last one
 func (n3ic *DBClient) PairOfSPOExists(ctx, spo1, spo2, spoIND1, spoIND2 string, vLow, vHigh int64) (r string, exist bool) {
 

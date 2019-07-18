@@ -244,14 +244,22 @@ func (n3c *N3Node) startWriteHandler() error {
 
 		// DONE: PRIVACY, STORE PRIVACY CONTROL FILE to <privctrl> & register it to <ctxid>
 		if ctx == "privctrl" {
-			if S(p).Contains("forcontext") { //                      *** register to ctxid ***
-				tupleQueue = append(tupleQueue, &pb.SPOTuple{Subject: root, Predicate: o, Object: s, Version: 0})
+			if S(p).Contains("forcontext") { //      *** register to ctxid (privacy control file) ***
+				vNext := dbClient.LatestVer("ctxid") + 1
+				tupleQueue = append(tupleQueue, &pb.SPOTuple{Subject: root, Predicate: o, Object: s, Version: vNext})
 				ctxQueue = append(ctxQueue, "ctxid")
 				goto PUB
 			}
 			if !S(s).IsUUID() || S(o).HP("::") || S(o).HP("[]") { // *** ignore unused tuples ***
 				return
 			}
+		}
+
+		if ctx == "ctxid" { //                       *** register to ctxid (cli) ***
+			vNext := dbClient.LatestVer("ctxid") + 1
+			tupleQueue = append(tupleQueue, &pb.SPOTuple{Subject: s, Predicate: p, Object: o, Version: vNext})
+			ctxQueue = append(ctxQueue, "ctxid")
+			goto PUB
 		}
 
 		// DONE: PRIVACY, CHECK PRIVACY RULES
@@ -533,7 +541,7 @@ func (n3c *N3Node) startReadHandler() error {
 
 		// DONE: PRIVACY *** delete pcObjCtxPathRW at runtime ***
 		if n3msg.CtxName == "ctxid" {
-			if s, p, o := tuple.Subject, tuple.Predicate, tuple.Object; o == MARKDelID && pcObjCtxPathRW[s] != nil {				
+			if s, p, o := tuple.Subject, tuple.Predicate, tuple.Object; o == MARKDelID && pcObjCtxPathRW[s] != nil {
 				delete(pcObjCtxPathRW[s], p)
 			}
 		}
