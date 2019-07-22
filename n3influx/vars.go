@@ -45,6 +45,7 @@ const (
 	orderByTm  = "time"    /* only ORDER BY time supported at this time */
 	MARKDead   = "TOMBSTONE"
 	MARKDelID  = "00000000-0000-0000-0000-000000000000"
+	MARKTerm   = "--------------------------------------" // len(uuid) + 2 : 38
 	DELIPath   = " ~ "
 	DELIChild  = " + "
 )

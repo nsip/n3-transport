@@ -250,7 +250,7 @@ func (n3c *N3Node) startWriteHandler() error {
 				ctxQueue = append(ctxQueue, "ctxid")
 				goto PUB
 			}
-			if !S(s).IsUUID() || S(o).HP("::") || S(o).HP("[]") { // *** ignore unused tuples ***
+			if !S(s).IsUUID() || S(o).HP("::") || S(o).HP("[]") { // *** ignore useless tuples ***
 				return
 			}
 		}
@@ -352,19 +352,20 @@ func (n3c *N3Node) startWriteHandler() error {
 		if (s == "*" || s == "") && p != "" && o != "" {
 
 			var IDs []string
-
 			switch {
-			case S(p).Contains(DELIPath): //                                            *** objectIDs by path-value ***
+			case p == MARKTerm: //                                         *** TerminatorID by Terminator & ObjectID ***
+				IDs = dbClient.IDListByPathValue(ctx, tuple, true)
+			case S(p).Contains(DELIPath): //                               *** objectIDs by path-value ***
 				IDs = dbClient.IDListByPathValue(ctx, tuple, false)
-			case IArrEleIn(p, Ss([]string{"root", "ROOT", "Root"})): //                 *** objectIDs by root name ***
+			case IArrEleIn(p, Ss([]string{"root", "ROOT", "Root"})): //    *** objectIDs by root name ***
 				IDs = dbClient.IDListByRoot(ctx, o)
 			}
 
 			if IDs != nil {
 				for _, id := range IArrRmRep(Ss(IDs)).([]string) {
-					if s == "*" { //                                                        *** including deleted ***
+					if s == "*" || p == MARKTerm { //                                       *** including deleted ObjectID OR get TerminatorID ***
 						ts = append(ts, &pb.SPOTuple{Subject: id, Predicate: p, Object: o})
-					} else { //                                                             *** excluding deleted ***
+					} else { //                                                             *** excluding deleted ObjectID ***
 						if exist, alive := dbClient.Status(ctx, id); exist && alive {
 							ts = append(ts, &pb.SPOTuple{Subject: id, Predicate: p, Object: o})
 						}
@@ -547,9 +548,9 @@ func (n3c *N3Node) startReadHandler() error {
 		}
 
 		// *** exclude "legend liftbridge data" ***
-		if inDB(pub, n3msg.CtxName, tuple) {
-			return
-		}
+		// if inDB(pub, n3msg.CtxName, tuple) {
+		// 	return
+		// }
 
 		err = pub.StoreTuple(tuple, n3msg.CtxName)
 		if err != nil {

@@ -68,15 +68,22 @@ func TestIDListByPathValue(t *testing.T) {
 	defer func() { ph(recover(), "./log.txt") }()
 	dbClient := must(NewDBClient()).(*DBClient)
 
+	tuple11 := &pb.SPOTuple{Predicate: MARKTerm, Object: "1822AF7A-F9CB-4F0D-96EA-9280DD0B6AB2"}
+	ids11 := dbClient.IDListByPathValue("demo", tuple11, true)
+	for i, id := range ids11 {
+		fPln(i, ":", id)
+	}
+	return
+
 	tuple := &pb.SPOTuple{Predicate: "NIAS3 ~ actor ~ name", Object: "Lillian Simon"}
-	ids1 := dbClient.IDListByPathValue("abc-xapi", tuple, false)
+	ids1 := dbClient.IDListByPathValue("demo", tuple, false)
 	// for i, id := range ids1 {
 	// 	fPln(i, ":", id)
 	// }
 	// fPln(" ids1 ------------------------------------- ")
 
 	tuple = &pb.SPOTuple{Predicate: "NIAS3 ~ object ~ id", Object: "http://example.com/assignments/Geography-7-1-B:4"}
-	ids2 := dbClient.IDListByPathValue("abc-xapi", tuple, false)
+	ids2 := dbClient.IDListByPathValue("demo", tuple, false)
 	// for i, id := range ids2 {
 	// 	fPln(i, ":", id)
 	// }
