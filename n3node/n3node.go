@@ -255,7 +255,8 @@ func (n3c *N3Node) startWriteHandler() error {
 			}
 		}
 
-		if ctx == "ctxid" { //                       *** register to ctxid (cli) ***
+		if ctx == "ctxid" { //                                       *** register / unregister to ctxid (cli) ***
+			tupleQueue, ctxQueue = []*pb.SPOTuple{}, []string{}
 			vNext := dbClient.LatestVer("ctxid") + 1
 			tupleQueue = append(tupleQueue, &pb.SPOTuple{Subject: s, Predicate: p, Object: o, Version: vNext})
 			ctxQueue = append(ctxQueue, "ctxid")
