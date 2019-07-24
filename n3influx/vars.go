@@ -33,10 +33,10 @@ var (
 
 	sSpl = strings.Split
 
-	SINDList = Ss([]string{"subject", "sub", "s", "SUBJECT", "SUB", "S"})
-	PINDList = Ss([]string{"predicate", "pred", "p", "PREDICATE", "PRED", "P"})
-	OINDList = Ss([]string{"object", "obj", "o", "OBJECT", "OBJ", "O"})
-	VINDList = Ss([]string{"version", "ver", "v", "VERSION", "VER", "V"})
+	SINDList = Ss{"subject", "sub", "s", "SUBJECT", "SUB", "S"}
+	PINDList = Ss{"predicate", "pred", "p", "PREDICATE", "PRED", "P"}
+	OINDList = Ss{"object", "obj", "o", "OBJECT", "OBJ", "O"}
+	VINDList = Ss{"version", "ver", "v", "VERSION", "VER", "V"}
 )
 
 const (

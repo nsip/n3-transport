@@ -9,7 +9,7 @@ import (
 
 // DbTblExists :
 func (n3ic *DBClient) DbTblExists(chkType, chkName string) bool {
-	if !IArrEleIn(chkType, Ss([]string{"databases", "DATABASES", "measurements", "MEASUREMENTS"})) {
+	if !IArrEleIn(chkType, Ss{"databases", "DATABASES", "measurements", "MEASUREMENTS"}) {
 		fPln(chkType, ": error. 1st param can only be [databases] OR [measurements]")
 		return false
 	}
@@ -284,20 +284,19 @@ func (n3ic *DBClient) LastOBySP(ctx, sub, pred string) string {
 }
 
 // OsBySP : (return objects, versions, IsFound)
-func (n3ic *DBClient) OsBySP(ctx string, tuple *pb.SPOTuple, extSub, extPred bool, vLow, vHigh int64) (Ss, Ps, Os []string, Vs []int64, found bool) {
+func (n3ic *DBClient) OsBySP(ctx, sub, pred string, extSub, extPred bool, vLow, vHigh int64) (Ss, Ps, Os []string, Vs []int64, found bool) {
 
-	s, p := tuple.Subject, tuple.Predicate
 	vChkL := IF(vLow > 0, fSf(" AND version>=%d ", vLow), " AND version>0 ").(string)
 	vChkH := IF(vHigh > 0, fSf(" AND version<=%d ", vHigh), "").(string)
 	qSelect, qWhere := fSf(`SELECT subject, predicate, object, version FROM "%s" `, ctx), ""
 	if extSub && !extPred {
-		qWhere = fSf(`WHERE subject=~/^%s/ AND predicate='%s' `+vChkL+vChkH, s, p)
+		qWhere = fSf(`WHERE subject=~/^%s/ AND predicate='%s' `+vChkL+vChkH, sub, pred)
 	} else if extSub && extPred {
-		qWhere = fSf(`WHERE subject=~/^%s/ AND predicate=~/^%s/ `+vChkL+vChkH, s, p)
+		qWhere = fSf(`WHERE subject=~/^%s/ AND predicate=~/^%s/ `+vChkL+vChkH, sub, pred)
 	} else if !extSub && extPred {
-		qWhere = fSf(`WHERE subject='%s' AND predicate=~/^%s/ `+vChkL+vChkH, s, p)
+		qWhere = fSf(`WHERE subject='%s' AND predicate=~/^%s/ `+vChkL+vChkH, sub, pred)
 	} else if !extSub && !extPred {
-		qWhere = fSf(`WHERE subject='%s' AND predicate='%s' `+vChkL+vChkH, s, p)
+		qWhere = fSf(`WHERE subject='%s' AND predicate='%s' `+vChkL+vChkH, sub, pred)
 	}
 	qStr := qSelect + qWhere + fSf(`ORDER BY %s DESC`, orderByTm)
 
@@ -318,13 +317,13 @@ func (n3ic *DBClient) OsBySP(ctx string, tuple *pb.SPOTuple, extSub, extPred boo
 
 // TuplesBySP :
 func (n3ic *DBClient) TuplesBySP(ctx string, tuple *pb.SPOTuple, ts *[]*pb.SPOTuple, vLow, vHigh int64) {
-	s, _, _ := tuple.Subject, tuple.Predicate, tuple.Object
+	s, p, _ := tuple.Subject, tuple.Predicate, tuple.Object
 	_, _, exist := n3ic.OneOfSPOExists(ctx, s, "S", vLow, vHigh)
 	if !exist {
 		// fPln("subject does not exist !")
 		return
 	}
-	if subs, preds, objs, vers, ok := n3ic.OsBySP(ctx, tuple, false, true, vLow, vHigh); ok {
+	if subs, preds, objs, vers, ok := n3ic.OsBySP(ctx, s, p, false, true, vLow, vHigh); ok {
 		for i := range subs {
 			*ts = append(*ts, &pb.SPOTuple{
 				Subject:   subs[i],
@@ -338,7 +337,7 @@ func (n3ic *DBClient) TuplesBySP(ctx string, tuple *pb.SPOTuple, ts *[]*pb.SPOTu
 
 // LastOV : we assume the return is unique, so use "fast" way to get the result
 func (n3ic *DBClient) LastOV(ctx string, tuple *pb.SPOTuple) (string, int64) {
-	if _, _, objs, vers, found := n3ic.OsBySP(ctx, tuple, false, false, 0, 0); found {
+	if _, _, objs, vers, found := n3ic.OsBySP(ctx, tuple.Subject, tuple.Predicate, false, false, 0, 0); found {
 		return objs[0], vers[0]
 	}
 	return "", -1

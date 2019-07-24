@@ -6,7 +6,6 @@ import (
 
 	u "github.com/cdutwhu/go-util"
 	w "github.com/cdutwhu/go-wrappers"
-	"golang.org/x/sync/syncmap"
 )
 
 var (
@@ -38,10 +37,10 @@ var (
 	mIDvQueue = make(map[string][]int64)
 	mIDsQueue = make(map[string][]int64)
 	mIDaQueue = make(map[string][]int64)
-	mTickets  = syncmap.Map{}
+	// mTickets  = syncmap.Map{}
 
 	//                        object     context    path   R/W
-	pcObjCtxPathRW = make(map[string]map[string]map[string]string) // map[string]map[string]map[string]string
+	pcObjCtxPathRW = make(map[string]map[string]map[string]string)
 	forroot        = ""
 	forctx         = ""
 )

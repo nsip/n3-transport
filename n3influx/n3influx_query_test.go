@@ -73,21 +73,27 @@ func TestIDListByPathValue(t *testing.T) {
 	for i, id := range ids11 {
 		fPln(i, ":", id)
 	}
-	return
+
+	_, _, ids22, _, _ := dbClient.OsBySP("demo", "644153cf-02c2-4670-810b-534ac148c011", MARKTerm, false, false, 0, 0)
+	for i, id := range ids22 {
+		fPln(i, ":", id)
+	}
 
 	tuple := &pb.SPOTuple{Predicate: "NIAS3 ~ actor ~ name", Object: "Lillian Simon"}
 	ids1 := dbClient.IDListByPathValue("demo", tuple, false)
-	// for i, id := range ids1 {
-	// 	fPln(i, ":", id)
-	// }
-	// fPln(" ids1 ------------------------------------- ")
+	for i, id := range ids1 {
+		fPln(i, ":", id)
+	}
+	fPln(" ids1 ------------------------------------- ")
 
 	tuple = &pb.SPOTuple{Predicate: "NIAS3 ~ object ~ id", Object: "http://example.com/assignments/Geography-7-1-B:4"}
-	ids2 := dbClient.IDListByPathValue("demo", tuple, false)
-	// for i, id := range ids2 {
-	// 	fPln(i, ":", id)
-	// }
-	// fPln(" ids2 ------------------------------------- ")
+	ids2 := dbClient.IDListByPathValue("demo", tuple, true)
+	for i, id := range ids2 {
+		fPln(i, ":", id)
+	}
+	fPln(" ids2 ------------------------------------- ")
+
+	return
 
 	ids := IArrIntersect(Ss(ids1), Ss(ids2))
 	for i, id := range ids.([]string) {

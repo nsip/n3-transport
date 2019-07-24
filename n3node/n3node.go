@@ -268,7 +268,7 @@ func (n3c *N3Node) startWriteHandler() error {
 				if pcPathCtrl, ok1 := pcCtxPathCtrl[ctx]; ok1 {
 					if ctrl, ok2 := pcPathCtrl[p]; ok2 {
 						switch {
-						case IArrEleIn(ctrl, Ss([]string{"R/W", "W/R", "RW", "WR", "W"})):
+						case IArrEleIn(ctrl, Ss{"R/W", "W/R", "RW", "WR", "W"}):
 						case S(ctrl).IsUUID():
 						default:
 							tupleQueue[0] = &pb.SPOTuple{Subject: s, Predicate: p, Object: NOWRITE, Version: v}
@@ -348,16 +348,15 @@ func (n3c *N3Node) startWriteHandler() error {
 			return
 		}
 
-		// *** <ObjectID List> query ***
-		if (s == "*" || s == "") && p != "" && o != "" {
-
+		// *** <ObjectID / TerminatorID List> query ***
+		if IArrEleIn(s, Ss{"*", ""}) && p != "" && o != "" {
 			var IDs []string
 			switch {
-			case p == MARKTerm: //                                         *** TerminatorID by Terminator & ObjectID ***
+			case p == MARKTerm: //                                     *** <TerminatorID> by Terminator & ObjectID ***
 				IDs = dbClient.IDListByPathValue(ctx, tuple, true)
-			case S(p).Contains(DELIPath): //                               *** objectIDs by path-value ***
+			case S(p).Contains(DELIPath): //                           *** <ObjectIDs> by path-value ***
 				IDs = dbClient.IDListByPathValue(ctx, tuple, false)
-			case IArrEleIn(p, Ss([]string{"root", "ROOT", "Root"})): //    *** objectIDs by root name ***
+			case IArrEleIn(p, Ss{"root", "ROOT", "Root"}): //          *** <ObjectIDs> by root name ***
 				IDs = dbClient.IDListByRoot(ctx, o)
 			}
 
@@ -375,8 +374,14 @@ func (n3c *N3Node) startWriteHandler() error {
 			return
 		}
 
-		// *** <Data> query; <SUBJECT> 's' must be ObjectID ***
+		// *** <Data> query; <SUBJECT> 's' must be ObjectID / TerminatorID ***
 		switch p {
+		case MARKTerm: //   *** <Terminator Line's ObjectID> ***
+			{
+				if _, _, ID, _, found := dbClient.OsBySP(ctx, s, p, false, false, 0, 0); found {
+					ts = append(ts, &pb.SPOTuple{Subject: s, Predicate: p, Object: ID[0]})
+				}
+			}
 		case "": //         *** <ROOT> ***
 			{
 				root := dbClient.RootByID(ctx, s, DELIPath)
@@ -387,7 +392,7 @@ func (n3c *N3Node) startWriteHandler() error {
 				metaType := matchAssign(p, "::", "[]", "S", "A").(string)
 				if start, end, _ := getVerRange(dbClient, p+s, ctx, metaType); start >= 1 { // *** Meta file to check alive ***
 					root := dbClient.RootByID(ctx, s, DELIPath)
-					if ss, _, os, vs, ok := dbClient.OsBySP(ctx, &pb.SPOTuple{Subject: root, Predicate: p + s}, true, false, start, end); ok {
+					if ss, _, os, vs, ok := dbClient.OsBySP(ctx, root, p+s, true, false, start, end); ok {
 						for i := range ss {
 							ts = append(ts, &pb.SPOTuple{Subject: s, Predicate: ss[i], Object: os[i], Version: vs[i]})
 						}
@@ -409,22 +414,22 @@ func (n3c *N3Node) startWriteHandler() error {
 				if start, end, _ := getVerRange(dbClient, s, ctx, metaType); start >= 1 { // *** Meta file to check alive ***
 
 					fPln("*** GENERAL QUERY ***")
-
 					// Fetch all tuples [ts]
 					dbClient.TuplesBySP(ctx, tuple, &ts, start, end)
 
+					fPln("*** CHECKING PRIVACY ***")
 					// DONE: PRIVACY, check privacy rules, modify [ts]
-					if !IArrEleIn(ctx, Ss([]string{"ctxid", "privctrl"})) && !S(ctx).HS("meta") {
+					if !IArrEleIn(ctx, Ss{"ctxid", "privctrl"}) && !S(ctx).HS("meta") {
 						for _, pt := range ts {
 							if S(pt.Subject).IsUUID() && S(pt.Predicate) != MARKTerm {
 								root := sSpl(pt.Predicate, DELIPath)[0]
 								if pcCtxPathRW, ok1 := pcObjCtxPathRW[root]; ok1 {
-									if pcPathRW, ok2 := pcCtxPathRW[ctx]; ok2 { //       *** has rules ***
+									if pcPathRW, ok2 := pcCtxPathRW[ctx]; ok2 { //              *** has rules ***
 										// fPln("DEBUG", pt.Predicate, pcPathRW[pt.Predicate])
 										switch {
 										case S(pcPathRW[pt.Predicate]).IsUUID():
 											continue
-										case !IArrEleIn(pcPathRW[pt.Predicate], Ss([]string{"R/W", "R", "RW", "WR"})):
+										case !IArrEleIn(pcPathRW[pt.Predicate], Ss{"R/W", "R", "RW", "WR"}):
 											pt.Object = NOREAD
 										}
 									}

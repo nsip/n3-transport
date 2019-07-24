@@ -64,7 +64,7 @@ func mkMetaTuple(dbClient *n3influx.DBClient, ctx, id string, start, end int64, 
 func assignVer(dbClient *n3influx.DBClient, tuple *pb.SPOTuple, ctx string) (metaTuple *pb.SPOTuple, metaCtx string) {
 
 	s, p, o, v := tuple.Subject, tuple.Predicate, tuple.Object, tuple.Version
-	fPln("assignVer:", s, p, o, v)
+	// fPln("assignVer:", s, p, o, v)
 
 	if S(s).IsUUID() && !S(o).HP("::") && !S(o).HP("[]") { //        *** value tuple *** (exclude S & A terminator)
 
@@ -115,7 +115,7 @@ func inDB(dbClient *n3influx.DBClient, ctx string, tuple *pb.SPOTuple) bool {
 	}
 
 	switch {
-	case IArrEleIn(ctx, Ss([]string{"ctxid", "privctrl"})):
+	case IArrEleIn(ctx, Ss{"ctxid", "privctrl"}):
 		return false
 	case S(ctx).HS("-meta"):
 		return false
