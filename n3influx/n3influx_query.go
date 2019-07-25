@@ -136,52 +136,6 @@ func (n3ic *DBClient) OneOfSPOExists(ctx, spo, spoIND string, vLow, vHigh int64)
 	return
 }
 
-// RootByID :
-func (n3ic *DBClient) RootByID(ctx, objID, del string) string {
-	if !S(ctx).HS("-meta") && S(objID).IsUUID() {
-		if p, _, ok := n3ic.OneOfSPOExists(ctx, objID, "S", -1, -1); ok && S(p).Contains(del) {
-			return sSpl(p, del)[0]
-		}
-	}
-	return ""
-}
-
-// IDListByRoot :
-func (n3ic *DBClient) IDListByRoot(ctx, root string) (ids []string) {
-	subs := n3ic.SingleListOfSPO(ctx, "S")
-	for _, s := range subs {
-		p, _ := n3ic.LastPOByS(ctx, s)
-		if S(p).HP(root + DELIPath) {
-			ids = append(ids, s)
-		}
-	}
-	return
-}
-
-// IDListByPathValue :
-func (n3ic *DBClient) IDListByPathValue(ctx string, tuple *pb.SPOTuple, caseSensitive bool) (ids []string) {
-	_, p, o := tuple.Subject, tuple.Predicate, tuple.Object
-
-	qSelect := fSf(`SELECT version, subject FROM "%s" `, ctx)
-	qWhere := fSf(`WHERE predicate='%s' AND object='%s' `, p, o)
-	if !caseSensitive {
-		objRegex := regex4CaseIns(o)
-		qWhere = fSf(`WHERE predicate='%s' AND object=~/%s/`, p, objRegex)
-	}
-	qStr := qSelect + qWhere + fSf(`ORDER BY %s`, orderByTm)
-	resp, e := n3ic.cl.Query(influx.NewQuery(qStr, db, ""))
-	pe(e, resp.Error())
-	if len(resp.Results[0].Series) > 0 {
-		for _, v := range resp.Results[0].Series[0].Values {
-			id := v[2].(string)
-			if S(id).IsUUID() {
-				ids = append(ids, id)
-			}
-		}
-	}
-	return
-}
-
 // SingleListOfSPO :
 func (n3ic *DBClient) SingleListOfSPO(ctx, spoIND string) (rst []string) {
 	wanted := "subject"
@@ -343,30 +297,89 @@ func (n3ic *DBClient) LastOV(ctx string, tuple *pb.SPOTuple) (string, int64) {
 	return "", -1
 }
 
+// ********************** !!! NOT GENERAL !!! *********************** //
+
 // Status :
 func (n3ic *DBClient) Status(ctx, ObjID string) (exist, alive bool) {
-	ctx = S(ctx).MkSuffix("-meta").V()
+	ctxMeta := S(ctx).MkSuffix("-meta").V()
 	ObjID = S(ObjID).RmPrefix("::").V()
 	ObjID = S(ObjID).RmPrefix("[]").V()
-	pred, _, exist := n3ic.OneOfSPOExists(ctx, ObjID, "S", -1, -1)
+	pred, _, exist := n3ic.OneOfSPOExists(ctxMeta, ObjID, "S", -1, -1)
 	return exist, pred != MARKDead
 }
 
-// ObjectCount :
-func (n3ic *DBClient) ObjectCount(ctx, objIDIND string) int64 {
+// IDListAll :
+func (n3ic *DBClient) IDListAll(ctx string, onlyalive bool) (IDs []string) {
+	ctxMeta := S(ctx).MkSuffix("-meta").V()
+	for _, s := range n3ic.SingleListOfSPO(ctxMeta, "S") {
+		if S(s).IsUUID() {
+			if onlyalive {
+				if exist, alive := n3ic.Status(ctx, s); exist && alive {
+					IDs = append(IDs, s)
+				}
+				continue
+			}
+			IDs = append(IDs, s)
+		}
+	}
+	return
+}
 
-	qSelect := fSf(`SELECT count(*) FROM "%s" `, ctx)
-	qWhere := fSf(`WHERE predicate=~/ ~ %s$/ AND predicate!~/ ~ [A-Za-z]+ ~ %s$/`, objIDIND, objIDIND)
-	qStr := qSelect + qWhere
+// ObjectCount :
+func (n3ic *DBClient) ObjectCount(ctx string, onlyalive bool) int64 {
+	if IDs := n3ic.IDListAll(ctx, onlyalive); IDs != nil {
+		return int64(len(IDs))
+	}
+	return 0
+}
+
+// RootByID :
+func (n3ic *DBClient) RootByID(ctx, objID, del string) string {
+	if !S(ctx).HS("-meta") && S(objID).IsUUID() {
+		if p, _, ok := n3ic.OneOfSPOExists(ctx, objID, "S", 0, 0); ok && S(p).Contains(del) {
+			return sSpl(p, del)[0]
+		}
+	}
+	return ""
+}
+
+// IDListByRoot :
+func (n3ic *DBClient) IDListByRoot(ctx, root, del string, onlyalive bool) (IDs []string) {
+	for _, id := range n3ic.IDListAll(ctx, onlyalive) {
+		p, _ := n3ic.LastPOByS(ctx, id)
+		if S(p).HP(root + del) {
+			IDs = append(IDs, id)
+		}
+	}
+	return
+}
+
+// IDListByPathValue :
+func (n3ic *DBClient) IDListByPathValue(ctx, path, value string, caseSensitive, onlyalive bool) (IDs []string) {
+	qSelect := fSf(`SELECT version, subject FROM "%s" `, ctx)
+	qWhere := fSf(`WHERE predicate='%s' AND object='%s' `, path, value)
+	if !caseSensitive {
+		objRegex := regex4CaseIns(value)
+		qWhere = fSf(`WHERE predicate='%s' AND object=~/%s/`, path, objRegex)
+	}
+	qStr := qSelect + qWhere + fSf(`ORDER BY %s`, orderByTm)
 	resp, e := n3ic.cl.Query(influx.NewQuery(qStr, db, ""))
 	pe(e, resp.Error())
 	if len(resp.Results[0].Series) > 0 {
 		for _, v := range resp.Results[0].Series[0].Values {
-			// fPln("object count:", v[1])
-			return must(v[1].(json.Number).Int64()).(int64)
+			id := v[2].(string)
+			if S(id).IsUUID() {
+				if onlyalive {
+					if exist, alive := n3ic.Status(ctx, id); exist && alive {
+						IDs = append(IDs, id)
+					}
+					continue
+				}
+				IDs = append(IDs, id)
+			}
 		}
 	}
-	return 0
+	return
 }
 
 // BatTransEx :

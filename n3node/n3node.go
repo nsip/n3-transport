@@ -282,8 +282,12 @@ func (n3c *N3Node) startWriteHandler() error {
 		// DONE: ASSIGN TUPLE VERSION
 		if p == MARKDead { //                                     *** Delete object ***
 			if exist, alive := dbClient.Status(ctx, s); exist && alive {
-				tupleQueue[0] = &pb.SPOTuple{Subject: s, Predicate: p, Object: now, Version: -1}
-				ctxQueue[0] = S(ctx).MkSuffix("-meta").V()
+				tupleV := &pb.SPOTuple{Subject: s, Predicate: p, Object: now, Version: -1}
+				tupleS := &pb.SPOTuple{Subject: "::" + s, Predicate: p, Object: now, Version: -1}
+				tupleA := &pb.SPOTuple{Subject: "[]" + s, Predicate: p, Object: now, Version: -1}
+				ctxMeta := S(ctx).MkSuffix("-meta").V()
+				tupleQueue = []*pb.SPOTuple{tupleV, tupleS, tupleA}
+				ctxQueue = []string{ctxMeta, ctxMeta, ctxMeta}
 			} else {
 				return
 			}
@@ -354,11 +358,11 @@ func (n3c *N3Node) startWriteHandler() error {
 			var IDs []string
 			switch {
 			case p == MARKTerm: //                                     *** <TerminatorID> by Terminator & ObjectID ***
-				IDs = dbClient.IDListByPathValue(ctx, tuple, true)
+				IDs = dbClient.IDListByPathValue(ctx, p, o, true, false)
 			case S(p).Contains(DELIPath): //                           *** <ObjectIDs> by path-value ***
-				IDs = dbClient.IDListByPathValue(ctx, tuple, false)
+				IDs = dbClient.IDListByPathValue(ctx, p, o, false, true)
 			case IArrEleIn(p, Ss{"root", "ROOT", "Root"}): //          *** <ObjectIDs> by root name ***
-				IDs = dbClient.IDListByRoot(ctx, o)
+				IDs = dbClient.IDListByRoot(ctx, o, DELIPath, true)
 			}
 
 			if IDs != nil {
@@ -391,11 +395,11 @@ func (n3c *N3Node) startWriteHandler() error {
 		case "[]", "::": // *** <ARRAY / STRUCT> ***
 			{
 				metaType := matchAssign(p, "::", "[]", "S", "A").(string)
-				if start, end, _ := getVerRange(dbClient, p+s, ctx, metaType); start >= 1 { // *** Meta file to check alive ***
+				if start, end, _ := getVerRange(dbClient, ctx, p+s, metaType); start >= 1 { // *** Meta file to check alive ***
 					root := dbClient.RootByID(ctx, s, DELIPath)
-					if ss, _, os, vs, ok := dbClient.OsBySP(ctx, root, p+s, true, false, start, end); ok {
+					if ss, ps, os, vs, ok := dbClient.OsBySP(ctx, p+s, root, false, true, start, end); ok {
 						for i := range ss {
-							ts = append(ts, &pb.SPOTuple{Subject: s, Predicate: ss[i], Object: os[i], Version: vs[i]})
+							ts = append(ts, &pb.SPOTuple{Subject: s, Predicate: ps[i], Object: os[i], Version: vs[i]})
 						}
 					}
 				}
@@ -404,15 +408,15 @@ func (n3c *N3Node) startWriteHandler() error {
 			{
 				metaType := conditionAssign(S(s).HP("::"), S(s).HP("[]"), "S", "A", "V").(string)
 
-				if S(ctx).HS("-meta") { //    *** REQUEST A TICKET FOR PUBLISH ***
-					if _, end, v := getVerRange(dbClient, s, ctx, metaType); end != -1 { // *** Meta file to check alive ***
+				if S(ctx).HS("-meta") { //    *** REQUEST A TICKET FOR PUBLISHING ***
+					if _, end, v := getVerRange(dbClient, ctx, s, metaType); end != -1 { // *** Meta file to check alive ***
 						return mkTicket(dbClient, ctx, s, end, v) //                        *** make a ticket for publishing, -1 means it's dead ***
 					}
 					return
 				}
 
 				//                            *** GENERAL QUERY ***
-				if start, end, _ := getVerRange(dbClient, s, ctx, metaType); start >= 1 { // *** Meta file to check alive ***
+				if start, end, _ := getVerRange(dbClient, ctx, s, metaType); start >= 1 { // *** Meta file to check alive ***
 
 					fPln("*** GENERAL QUERY ***")
 					// Fetch all tuples [ts]

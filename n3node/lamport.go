@@ -6,7 +6,7 @@ import (
 	// "golang.org/x/sync/syncmap"
 )
 
-func getVerRange(dbClient *n3influx.DBClient, objID string, ctx, metaType string) (start, end, ver int64) {
+func getVerRange(dbClient *n3influx.DBClient, ctx, objID, metaType string) (start, end, ver int64) {
 	if exist, alive := dbClient.Status(ctx, objID); exist && alive {
 		ctxMeta := S(ctx).MkSuffix("-meta").V()
 		o, v := dbClient.LastOV(ctxMeta, &pb.SPOTuple{Subject: objID, Predicate: metaType})
@@ -78,29 +78,29 @@ func assignVer(dbClient *n3influx.DBClient, tuple *pb.SPOTuple, ctx string) (met
 		}
 		prevIDv, prevVerV = s, v
 
-	} else if S(p).HP("::") || (S(s).IsUUID() && S(o).HP("::")) { // *** struct tuple *** (include S terminator)
+	} else if S(s).HP("::") || (S(s).IsUUID() && S(o).HP("::")) { // *** struct tuple *** (include S terminator)
 
-		if p != prevIDs && p != MARKTerm {
-			mIDsQueue[p] = append(mIDsQueue[p], v)
-			l := len(mIDsQueue[p])
-			startVer = mIDsQueue[p][l-1]
+		if s != prevIDs && p != MARKTerm {
+			mIDsQueue[s] = append(mIDsQueue[s], v)
+			l := len(mIDsQueue[s])
+			startVer = mIDsQueue[s][l-1]
 		}
 		if p == MARKTerm {
 			metaTuple, metaCtx = mkMetaTuple(dbClient, ctx, prevIDs, startVer, prevVerS, "S")
 		}
-		prevIDs, prevVerS = p, v
+		prevIDs, prevVerS = s, v
 
-	} else if S(p).HP("[]") || (S(s).IsUUID() && S(o).HP("[]")) { // *** array tuple *** (include A terminator)
+	} else if S(s).HP("[]") || (S(s).IsUUID() && S(o).HP("[]")) { // *** array tuple *** (include A terminator)
 
-		if p != prevIDa && p != MARKTerm {
-			mIDaQueue[p] = append(mIDaQueue[p], v)
-			l := len(mIDaQueue[p])
-			startVer = mIDaQueue[p][l-1]
+		if s != prevIDa && p != MARKTerm {
+			mIDaQueue[s] = append(mIDaQueue[s], v)
+			l := len(mIDaQueue[s])
+			startVer = mIDaQueue[s][l-1]
 		}
 		if p == MARKTerm {
 			metaTuple, metaCtx = mkMetaTuple(dbClient, ctx, prevIDa, startVer, prevVerA, "A")
 		}
-		prevIDa, prevVerA = p, v
+		prevIDa, prevVerA = s, v
 
 	} else {
 
@@ -131,15 +131,15 @@ func inDB(dbClient *n3influx.DBClient, ctx string, tuple *pb.SPOTuple) bool {
 // 	if !S(ctx).HS("-meta") { //                                                           *** DATA TABLE ***
 
 // 		if S(s).IsUUID() && p != MARKTerm { //                                            *** VALUES ***
-// 			if _, end, _ := getVerRange(dbClient, s, ctx, "V"); v <= end {
+// 			if _, end, _ := getVerRange(dbClient, ctx, s, "V"); v <= end {
 // 				return true
 // 			}
 // 		} else if S(p).HP("::") { //                                                      *** STRUCT ***
-// 			if _, end, _ := getVerRange(dbClient, p, ctx, "S"); v <= end {
+// 			if _, end, _ := getVerRange(dbClient, ctx, p, "S"); v <= end {
 // 				return true
 // 			}
 // 		} else if S(p).HP("[]") { //                                                      *** ARRAY ***
-// 			if _, end, _ := getVerRange(dbClient, p, ctx, "A"); v <= end {
+// 			if _, end, _ := getVerRange(dbClient, ctx, p, "A"); v <= end {
 // 				return true
 // 			}
 // 		} else { //                                                                       *** MARKTerm ***

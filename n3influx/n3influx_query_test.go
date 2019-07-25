@@ -2,9 +2,43 @@ package n3influx
 
 import (
 	"testing"
-
-	"github.com/nsip/n3-messages/messages/pb"
 )
+
+func TestStatus(t *testing.T) {
+	defer func() { ph(recover(), "./log.txt") }()
+	dbClient := must(NewDBClient()).(*DBClient)
+	fPln(dbClient.Status("demo", "8d3f76b7-33c5-4ee4-918f-247efc22fc54"))
+}
+
+func TestIDListAll(t *testing.T) {
+	defer func() { ph(recover(), "./log.txt") }()
+	dbClient := must(NewDBClient()).(*DBClient)
+	fPln(dbClient.IDListAll("demo", false))
+}
+
+func TestObjectCount(t *testing.T) {
+	defer func() { ph(recover(), "./log.txt") }()
+	dbClient := must(NewDBClient()).(*DBClient)
+	fPln(dbClient.ObjectCount("demo", true))
+}
+
+func TestRootByID(t *testing.T) {
+	defer func() { ph(recover(), "./log.txt") }()
+	dbClient := must(NewDBClient()).(*DBClient)
+	fPln(dbClient.RootByID("demo", "04d33e4e-05a4-4537-badc-46c75ec5541c", " ~ "))
+}
+
+func TestIDListByRoot(t *testing.T) {
+	defer func() { ph(recover(), "./log.txt") }()
+	dbClient := must(NewDBClient()).(*DBClient)
+
+	ids := dbClient.IDListByRoot("demo", "Overview", " ~ ", true)
+	for i, id := range ids {
+		fPln(i, ":", id)
+	}
+}
+
+// ***************************
 
 func TestDbTblExists(t *testing.T) {
 	defer func() { ph(recover(), "./log.txt") }()
@@ -18,18 +52,12 @@ func TestLatestVer(t *testing.T) {
 	fPln(dbClient.LatestVer("ctxid"))
 }
 
-func TestRootByID(t *testing.T) {
-	defer func() { ph(recover(), "./log.txt") }()
-	dbClient := must(NewDBClient()).(*DBClient)
-	fPln(dbClient.RootByID("demo", "00e6291b-884f-4fa2-92a1-bd477634be97", " ~ "))
-}
-
-func TestObjectCount(t *testing.T) {
-	defer func() { ph(recover(), "./log.txt") }()
-	dbClient := must(NewDBClient()).(*DBClient)
-	n := dbClient.ObjectCount("demo", "id")
-	fPln("object count:", n)
-}
+// func TestObjectCount(t *testing.T) {
+// 	defer func() { ph(recover(), "./log.txt") }()
+// 	dbClient := must(NewDBClient()).(*DBClient)
+// 	n := dbClient.ObjectCount("demo", false)
+// 	fPln("object count:", n)
+// }
 
 // func TestGetObjs(t *testing.T) {
 // 	defer func() { PH(recover(), "./log.txt") }()
@@ -53,23 +81,11 @@ func TestObjectCount(t *testing.T) {
 // 	time.Sleep(20 * time.Millisecond)
 // }
 
-func TestIDListByRoot(t *testing.T) {
-	defer func() { ph(recover(), "./log.txt") }()
-	dbClient := must(NewDBClient()).(*DBClient)
-
-	ids := dbClient.IDListByRoot("demo", "xapi")
-	for i, id := range ids {
-		fPln(i, ":", id)
-	}
-	fPln(" ids ------------------------------------- ")
-}
-
 func TestIDListByPathValue(t *testing.T) {
 	defer func() { ph(recover(), "./log.txt") }()
 	dbClient := must(NewDBClient()).(*DBClient)
 
-	tuple11 := &pb.SPOTuple{Predicate: MARKTerm, Object: "1822AF7A-F9CB-4F0D-96EA-9280DD0B6AB2"}
-	ids11 := dbClient.IDListByPathValue("demo", tuple11, true)
+	ids11 := dbClient.IDListByPathValue("demo", MARKTerm, "20c4ae8e-c4f0-4851-ac45-8d8e8651ce3e", true, false)
 	for i, id := range ids11 {
 		fPln(i, ":", id)
 	}
@@ -79,26 +95,24 @@ func TestIDListByPathValue(t *testing.T) {
 		fPln(i, ":", id)
 	}
 
-	tuple := &pb.SPOTuple{Predicate: "NIAS3 ~ actor ~ name", Object: "Lillian Simon"}
-	ids1 := dbClient.IDListByPathValue("demo", tuple, false)
-	for i, id := range ids1 {
-		fPln(i, ":", id)
-	}
-	fPln(" ids1 ------------------------------------- ")
+	// tuple := &pb.SPOTuple{Predicate: "NIAS3 ~ actor ~ name", Object: "Lillian Simon"}
+	// ids1 := dbClient.IDListByPathValue("demo", tuple, false)
+	// for i, id := range ids1 {
+	// 	fPln(i, ":", id)
+	// }
+	// fPln(" ids1 ------------------------------------- ")
 
-	tuple = &pb.SPOTuple{Predicate: "NIAS3 ~ object ~ id", Object: "http://example.com/assignments/Geography-7-1-B:4"}
-	ids2 := dbClient.IDListByPathValue("demo", tuple, true)
-	for i, id := range ids2 {
-		fPln(i, ":", id)
-	}
-	fPln(" ids2 ------------------------------------- ")
+	// tuple = &pb.SPOTuple{Predicate: "NIAS3 ~ object ~ id", Object: "http://example.com/assignments/Geography-7-1-B:4"}
+	// ids2 := dbClient.IDListByPathValue("demo", tuple, true)
+	// for i, id := range ids2 {
+	// 	fPln(i, ":", id)
+	// }
+	// fPln(" ids2 ------------------------------------- ")
 
-	return
-
-	ids := IArrIntersect(Ss(ids1), Ss(ids2))
-	for i, id := range ids.([]string) {
-		fPln(i, ":", id)
-	}
+	// ids := IArrIntersect(Ss(ids1), Ss(ids2))
+	// for i, id := range ids.([]string) {
+	// 	fPln(i, ":", id)
+	// }
 }
 
 // func TestBatTrans(t *testing.T) {
