@@ -10,8 +10,8 @@ import (
 	"os/exec"
 	"time"
 
-	cmn "../../common"
-	"../../n3node"
+	cmn "github.com/nsip/n3-client/common"
+	"github.com/nsip/n3-client/n3node"
 	"github.com/pkg/errors"
 )
 

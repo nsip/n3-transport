@@ -15,7 +15,7 @@
 package main
 
 import (
-	"../../n3cli/cmd"
+	"github.com/nsip/n3-client/n3cli/cmd"
 )
 
 func main() {
