@@ -6,9 +6,9 @@ import (
 	"log"
 	"time"
 
-	tm "../../../n3tendermint"
 	"github.com/nats-io/nuid"
 	"github.com/nsip/n3-messages/messages"
+	tm "github.com/nsip/n3-transport/n3tendermint"
 )
 
 // example tuple publisher for tendermint transport

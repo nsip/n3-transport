@@ -15,7 +15,7 @@ CWD=`pwd`
 
 
 echo "removing existing builds"
-rm -r build
+rm -rf build
 
 echo "Creating n3 binaries"
 
@@ -31,6 +31,12 @@ echo "Creating service binaries"
 
 GOOS="$GOOS" GOARCH="$GOARCH" go build -ldflags="$LDFLAGS" -o build/services/gnatsd/gnatsd ../../nats-io/gnatsd
 GOOS="$GOOS" GOARCH="$GOARCH" go build -ldflags="$LDFLAGS" -o build/services/liftbridge/liftbridge ../../liftbridge-io/liftbridge
+
+echo "Libraries"
+cd n3crypto; go get; cd ..
+cd n3config; go get; cd ..
+cd n3dispatcher; go get; cd ..
+cd n3liftbridge; go get; cd ..
 
 echo "Building influx"
 mkdir ./build/services/influx

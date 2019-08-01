@@ -3,7 +3,7 @@ package n3node
 import (
 	"testing"
 
-	db "../n3influx"
+	db "github.com/nsip/n3-transport/n3influx"
 )
 
 func TestMKPrivCtrl(t *testing.T) {

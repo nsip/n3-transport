@@ -8,8 +8,8 @@ import (
 	"log"
 	"os"
 
-	"../common"
-	"../n3crypto"
+	"github.com/nsip/n3-transport/common"
+	"github.com/nsip/n3-transport/n3crypto"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 )

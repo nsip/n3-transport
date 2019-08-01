@@ -1,7 +1,7 @@
 package n3node
 
 import (
-	"../n3influx"
+	"github.com/nsip/n3-transport/n3influx"
 )
 
 // // PrivCtrlRule :
