@@ -25,7 +25,7 @@ func TestObjectCount(t *testing.T) {
 func TestRootByID(t *testing.T) {
 	defer func() { ph(recover(), "./log.txt") }()
 	dbClient := must(NewDBClient()).(*DBClient)
-	fPln(dbClient.RootByID("demo", "04d33e4e-05a4-4537-badc-46c75ec5541c", " ~ "))
+	fPln(dbClient.RootByID("demo", "d99702d1-c079-44f9-a5cb-27fc0cd87e34", " ~ "))
 }
 
 func TestIDListByRoot(t *testing.T) {

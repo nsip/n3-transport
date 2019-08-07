@@ -80,7 +80,7 @@ func launchServices() error {
 	if serviceError != nil {
 		return errors.Wrap(serviceError, "cannot launch dispatcher service:")
 	}
-	log.Println("...disptcher service up.")
+	log.Println("...dispatcher service up.")
 	cnclInflux, serviceError = launchInflux()
 	if serviceError != nil {
 		return errors.Wrap(serviceError, "cannot launch influx service:")
