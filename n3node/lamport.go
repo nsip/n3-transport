@@ -1,8 +1,8 @@
 package n3node
 
 import (
-	"../n3influx"
 	"github.com/nsip/n3-messages/messages/pb"
+	"github.com/nsip/n3-transport/n3influx"
 	// "golang.org/x/sync/syncmap"
 )
 

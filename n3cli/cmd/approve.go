@@ -18,10 +18,10 @@ import (
 	"log"
 	"strings"
 
-	"../../n3config"
 	nats "github.com/nats-io/go-nats"
 	"github.com/nsip/n3-messages/messages"
 	"github.com/nsip/n3-messages/messages/pb"
+	"github.com/nsip/n3-transport/n3config"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )

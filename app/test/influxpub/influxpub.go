@@ -8,15 +8,15 @@ import (
 	"log"
 	"time"
 
-	inf "../../../n3influx"
 	"github.com/nats-io/nuid"
 	"github.com/nsip/n3-messages/messages"
+	inf "github.com/nsip/n3-transport/n3influx"
 )
 
 // example tuple publisher for influx data-store
 func main() {
 
-	infPub, err := inf.NewPublisher()
+	infPub, err := inf.NewDBClient()
 	if err != nil {
 		log.Fatal(err)
 	}

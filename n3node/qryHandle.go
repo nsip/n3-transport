@@ -1,9 +1,9 @@
 package n3node
 
 import (
-	"../n3influx"
 	"github.com/google/uuid"
 	"github.com/nsip/n3-messages/messages/pb"
+	"github.com/nsip/n3-transport/n3influx"
 )
 
 func mkTicket(dbClt *n3influx.DBClient, ctx, sub string, end, v int64) (ts []*pb.SPOTuple) {
