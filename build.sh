@@ -35,13 +35,17 @@ cp */usr/bin/influxd ../services/
 cp */etc/influxdb/influxdb.conf ../services/
 cd $CWD
 
-exit 1
-
 echo "Creating n3 binaries"
 
 GOOS=darwin
 GOARCH=amd64
 LDFLAGS="-s -w"
+
+export GO111MODULE=on
+
+cd app/n3cli; go get; cd $CWD
+cd app/n3dispatcher; go get; cd $CWD
+cd app/n3node; go get; cd $CWD
 
 GOOS="$GOOS" GOARCH="$GOARCH" go build -ldflags="$LDFLAGS" -o build/n3cli ./app/n3cli
 GOOS="$GOOS" GOARCH="$GOARCH" go build -ldflags="$LDFLAGS" -o build/n3dispatcher/n3dispatcher ./app/n3dispatcher
