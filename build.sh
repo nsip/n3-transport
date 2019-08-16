@@ -41,7 +41,13 @@ GOOS=darwin
 GOARCH=amd64
 LDFLAGS="-s -w"
 
+export GO111MODULE=off
+go get github.com/liftbridge-io/go-liftbridge
+cd $GOPATH/src/github.com/liftbridge-io/go-liftbridge
 export GO111MODULE=on
+go get
+go build
+export GO111MODULE=off
 
 cd app/n3cli; go get; cd $CWD
 cd app/n3dispatcher; go get; cd $CWD
