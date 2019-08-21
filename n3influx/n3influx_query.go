@@ -13,7 +13,6 @@ func (n3ic *DBClient) DbTblExists(chkType, chkName string) bool {
 		fPln(chkType, ": error. 1st param can only be [databases] OR [measurements]")
 		return false
 	}
-
 	qStr := fSf(`show %s`, chkType)
 	resp, e := n3ic.cl.Query(influx.NewQuery(qStr, db, ""))
 	pe(e, resp.Error())
@@ -29,28 +28,58 @@ func (n3ic *DBClient) DbTblExists(chkType, chkName string) bool {
 	return false
 }
 
+// MetaTblList : List all meta tables
+func (n3ic *DBClient) MetaTblList() (metas []string) {
+	qStr := fSf(`show measurements`)
+	resp, e := n3ic.cl.Query(influx.NewQuery(qStr, db, ""))
+	pe(e, resp.Error())
+	if len(resp.Results[0].Series) > 0 && len(resp.Results[0].Series[0].Values) > 0 {
+		allItems := resp.Results[0].Series[0].Values
+		for _, item := range allItems {
+			// fPln(item[0]) //               *** first field ***
+			if S(item[0].(string)).HS("-meta") {
+				metas = append(metas, item[0].(string))
+			}
+		}
+	}
+	return
+}
+
+// DumpAllTuples :
+func (n3ic *DBClient) DumpAllTuples(ctx string) (ss, ps, os []string, vs []int64) {
+	qSelect := fSf(`SELECT version, subject, predicate, object FROM "%s" `, ctx)
+	qStr := qSelect + fSf(`ORDER BY %s DESC`, orderByTm)
+	resp, e := n3ic.cl.Query(influx.NewQuery(qStr, db, ""))
+	pe(e, resp.Error())
+	if len(resp.Results[0].Series) > 0 && len(resp.Results[0].Series[0].Values) > 0 {
+		allItems := resp.Results[0].Series[0].Values
+		for _, item := range allItems {
+			v, s, p, o := must(item[1].(json.Number).Int64()).(int64), item[2].(string), item[3].(string), item[4].(string)
+			ss, ps, os, vs = append(ss, s), append(ps, p), append(os, o), append(vs, v)
+		}
+	}
+	return
+}
+
 // TupleExists :
 func (n3ic *DBClient) TupleExists(ctx string, tuple *pb.SPOTuple, ignoreFields ...string) bool {
 	s, p, o, v := tuple.Subject, tuple.Predicate, tuple.Object, tuple.Version
-
 	qSelect := fSf(`SELECT version, subject, predicate, object FROM "%s" `, ctx)
 	qWhere := fSf(`WHERE subject='%s' AND predicate='%s' AND object='%s' AND version=%d `, s, p, o, v)
-
 	if L := len(ignoreFields); L == 1 {
 		// PC(L != 0 && L != 1, fEf("Currently only support ignoring 1 Field(s)"))
-		ignrFld := ignoreFields[0]
+		ignore := ignoreFields[0]
 		switch {
-		case IArrEleIn(ignrFld, SINDList):
+		case IArrEleIn(ignore, SINDList):
 			qWhere = fSf(`WHERE predicate='%s' AND object='%s' AND version=%d `, p, o, v)
-		case IArrEleIn(ignrFld, PINDList):
+		case IArrEleIn(ignore, PINDList):
 			qWhere = fSf(`WHERE subject='%s' AND object='%s' AND version=%d `, s, o, v)
-		case IArrEleIn(ignrFld, OINDList):
+		case IArrEleIn(ignore, OINDList):
 			qWhere = fSf(`WHERE subject='%s' AND predicate='%s' AND version=%d `, s, p, v)
-		case IArrEleIn(ignrFld, VINDList):
+		case IArrEleIn(ignore, VINDList):
 			qWhere = fSf(`WHERE subject='%s' AND predicate='%s' AND object='%s' `, s, p, o)
 		}
 	}
-
 	qStr := qSelect + qWhere + fSf(`ORDER BY %s DESC`, orderByTm)
 	resp, e := n3ic.cl.Query(influx.NewQuery(qStr, db, ""))
 	pe(e, resp.Error())
@@ -72,32 +101,26 @@ func (n3ic *DBClient) LatestVer(ctx string) int64 {
 
 // PairOfSPOExists : spoIND1 -> "s", "p"; spoIND2 -> "p", "o". if exists, get the last one
 func (n3ic *DBClient) PairOfSPOExists(ctx, spo1, spo2, spoIND1, spoIND2 string, vLow, vHigh int64) (r string, exist bool) {
-
 	vChkL := IF(vLow > 0, fSf(" AND version>=%d ", vLow), "").(string)
 	vChkH := IF(vHigh > 0, fSf(" AND version<=%d ", vHigh), "").(string)
-
 	qSelect, qWhere := "", ""
 	switch {
 	case IArrEleIn(spoIND1, SINDList) && IArrEleIn(spoIND2, PINDList):
 		s, p := spo1, spo2
 		qSelect = fSf(`SELECT version, object FROM "%s" `, ctx)
 		qWhere = fSf(`WHERE subject='%s' AND predicate='%s' `+vChkL+vChkH, s, p)
-
 	case IArrEleIn(spoIND1, SINDList) && IArrEleIn(spoIND2, OINDList):
 		s, o := spo1, spo2
 		qSelect = fSf(`SELECT version, predicate FROM "%s" `, ctx)
 		qWhere = fSf(`WHERE subject='%s' AND object='%s' `+vChkL+vChkH, s, o)
-
 	case IArrEleIn(spoIND1, PINDList) && IArrEleIn(spoIND2, OINDList):
 		p, o := spo1, spo2
 		qSelect = fSf(`SELECT version, subject FROM "%s" `, ctx)
 		qWhere = fSf(`WHERE predicate='%s' AND object='%s' `+vChkL+vChkH, p, o)
 	}
-
 	qStr := qSelect + qWhere + fSf(`ORDER BY %s DESC LIMIT 1`, orderByTm)
 	resp, e := n3ic.cl.Query(influx.NewQuery(qStr, db, ""))
 	pe(e, resp.Error())
-
 	if len(resp.Results[0].Series) > 0 && len(resp.Results[0].Series[0].Values) > 0 {
 		lastItem := resp.Results[0].Series[0].Values[0]
 		r, exist = lastItem[2].(string), true
@@ -107,10 +130,8 @@ func (n3ic *DBClient) PairOfSPOExists(ctx, spo1, spo2, spoIND1, spoIND2 string, 
 
 // OneOfSPOExists : if exists, get the last one
 func (n3ic *DBClient) OneOfSPOExists(ctx, spo, spoIND string, vLow, vHigh int64) (r1, r2 string, exist bool) {
-
 	vChkL := IF(vLow > 0, fSf(" AND version>=%d ", vLow), "").(string)
 	vChkH := IF(vHigh > 0, fSf(" AND version<=%d ", vHigh), "").(string)
-
 	qSelect, qWhere := "", ""
 	switch {
 	case IArrEleIn(spoIND, SINDList):
@@ -123,11 +144,9 @@ func (n3ic *DBClient) OneOfSPOExists(ctx, spo, spoIND string, vLow, vHigh int64)
 		qSelect = fSf(`SELECT version, subject, predicate FROM "%s" `, ctx)
 		qWhere = fSf(`WHERE object='%s' `+vChkL+vChkH, spo)
 	}
-
 	qStr := qSelect + qWhere + fSf(`ORDER BY %s DESC LIMIT 1`, orderByTm)
 	resp, e := n3ic.cl.Query(influx.NewQuery(qStr, db, ""))
 	pe(e, resp.Error())
-
 	// pln(resp.Results[0].Series[0].Values[0][1]) /* [0] is time, [1] is as SELECT ... */
 	if len(resp.Results[0].Series) > 0 && len(resp.Results[0].Series[0].Values) > 0 {
 		lastItem := resp.Results[0].Series[0].Values[0]
@@ -160,10 +179,8 @@ func (n3ic *DBClient) SingleListOfSPO(ctx, spoIND string) (rst []string) {
 
 // PairListOfSPO : get unique pairs' their own last remain value
 func (n3ic *DBClient) PairListOfSPO(ctx, spoExcl string) (rst1, rst2, rstRemain []string) {
-
 	r1, r2 := []string{}, []string{}
 	spoIND1, spoIND2 := "", ""
-
 	switch {
 	case IArrEleIn(spoExcl, SINDList):
 		r1, r2 = n3ic.SingleListOfSPO(ctx, "P"), n3ic.SingleListOfSPO(ctx, "O")
@@ -175,7 +192,6 @@ func (n3ic *DBClient) PairListOfSPO(ctx, spoExcl string) (rst1, rst2, rstRemain 
 		r1, r2 = n3ic.SingleListOfSPO(ctx, "S"), n3ic.SingleListOfSPO(ctx, "P")
 		spoIND1, spoIND2 = "S", "P"
 	}
-
 	for _, i1 := range r1 {
 		for _, i2 := range r2 {
 			if r, ok := n3ic.PairOfSPOExists(ctx, i1, i2, spoIND1, spoIND2, -1, -1); ok {
@@ -183,7 +199,6 @@ func (n3ic *DBClient) PairListOfSPO(ctx, spoExcl string) (rst1, rst2, rstRemain 
 			}
 		}
 	}
-
 	return
 }
 
@@ -239,7 +254,6 @@ func (n3ic *DBClient) LastOBySP(ctx, sub, pred string) string {
 
 // OsBySP : (return objects, versions, IsFound)
 func (n3ic *DBClient) OsBySP(ctx, sub, pred string, extSub, extPred bool, vLow, vHigh int64) (Ss, Ps, Os []string, Vs []int64, found bool) {
-
 	vChkL := IF(vLow > 0, fSf(" AND version>=%d ", vLow), " AND version>0 ").(string)
 	vChkH := IF(vHigh > 0, fSf(" AND version<=%d ", vHigh), "").(string)
 	qSelect, qWhere := fSf(`SELECT subject, predicate, object, version FROM "%s" `, ctx), ""
@@ -253,10 +267,8 @@ func (n3ic *DBClient) OsBySP(ctx, sub, pred string, extSub, extPred bool, vLow, 
 		qWhere = fSf(`WHERE subject='%s' AND predicate='%s' `+vChkL+vChkH, sub, pred)
 	}
 	qStr := qSelect + qWhere + fSf(`ORDER BY %s DESC`, orderByTm)
-
 	resp, e := n3ic.cl.Query(influx.NewQuery(qStr, db, ""))
 	pe(e, resp.Error())
-
 	if len(resp.Results[0].Series) > 0 && len(resp.Results[0].Series[0].Values) > 0 {
 		for _, l := range resp.Results[0].Series[0].Values {
 			sub, pred, obj := l[1].(string), l[2].(string), l[3].(string)
@@ -385,7 +397,6 @@ func (n3ic *DBClient) IDListByPathValue(ctx, path, value string, caseSensitive, 
 // BatTransEx :
 // func (n3ic *DBClient) BatTransEx(tuple *pb.SPOTuple, ctx, ctxNew string, extSub, extPred bool, vLow, vHigh int64,
 // 	exclude func(s, p, o string, v int64) bool) (n int64) {
-
 // 	if ss, ps, os, vs, ok := n3ic.GetObjs(tuple, ctx, extSub, extPred, vLow, vHigh); ok {
 // 		for i := range ss {
 // 			if exclude(ss[i], ps[i], os[i], vs[i]) {
@@ -401,11 +412,9 @@ func (n3ic *DBClient) IDListByPathValue(ctx, path, value string, caseSensitive, 
 
 // BatTrans :
 // func (n3ic *DBClient) BatTrans(tuple *pb.SPOTuple, ctx, ctxNew string, extSub, extPred bool, vLow, vHigh int64) int64 {
-
 // 	s, p := tuple.Subject, tuple.Predicate
 // 	vChkL := u.TerOp(vLow > 0, fSf(" AND version>=%d ", vLow), " AND version>0 ").(string)
 // 	vChkH := u.TerOp(vHigh > 0, fSf(" AND version<=%d ", vHigh), "").(string)
-
 // 	qSelect, qWhere := fSf(`SELECT version, subject, predicate, object INTO "%s" FROM "%s" `, ctxNew, ctx), ""
 // 	if extSub && !extPred {
 // 		qWhere = fSf(`WHERE subject=~/^%s/ AND predicate='%s' `+vChkL+vChkH, s, p)
@@ -417,9 +426,7 @@ func (n3ic *DBClient) IDListByPathValue(ctx, path, value string, caseSensitive, 
 // 		qWhere = fSf(`WHERE subject='%s' AND predicate='%s' `+vChkL+vChkH, s, p)
 // 	}
 // 	qStr := qSelect + qWhere + fSf(`ORDER BY %s DESC`, orderByTm)
-
 // 	resp, e := n3ic.cl.Query(influx.NewQuery(qStr, db, ""))
 // 	PE(e, resp.Error())
-
 // 	return Must(resp.Results[0].Series[0].Values[0][1].(json.Number).Int64()).(int64)
 // }

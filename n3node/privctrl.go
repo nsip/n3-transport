@@ -1,6 +1,8 @@
 package n3node
 
 import (
+	"sync"
+
 	"github.com/nsip/n3-transport/n3influx"
 )
 
@@ -40,20 +42,16 @@ func mkPrivCtrl(dbClt *n3influx.DBClient) (ObjCtxPathCtrl map[string]map[string]
 	for i := 0; i < len(rst1); i++ {                         //     *** each rst1 is distinct ***
 		ID := rstLeft[i]
 		if ID != MARKDelID {
-
 			// fPln(rst1[i], rst2[i], ID)
 			object, ctx := rst1[i], rst2[i]
-
 			if _, ok := ObjCtxPathCtrl[object]; !ok {
 				//                                contex     path   ctrl
 				ObjCtxPathCtrl[object] = make(map[string]map[string]string)
 			}
-
 			if _, ok := ObjCtxPathCtrl[object][ctx]; !ok {
 				//                                     path   ctrl
 				ObjCtxPathCtrl[object][ctx] = make(map[string]string)
 			}
-
 			verstrs := sSpl(dbClt.LastOBySP("privctrl-meta", ID, "V"), "-")
 			vlow, vhigh := S(verstrs[0]).ToInt64(), S(verstrs[1]).ToInt64()
 			fPln(vlow, vhigh)
@@ -64,4 +62,35 @@ func mkPrivCtrl(dbClt *n3influx.DBClient) (ObjCtxPathCtrl map[string]map[string]
 		}
 	}
 	return
+}
+
+// ********************************************************
+
+// doing
+func mkObjIDVerBuf(dbClt *n3influx.DBClient) *sync.Map {
+	var mpIDVer sync.Map
+	for _, m := range dbClt.MetaTblList() {
+		// IDs := dbClt.IDListAll(m, false)
+		// for _, id := range IDs {
+		// 	idV, idS, idA := id, "::"+id, "[]"+id
+		// 	if o := dbClt.LastOBySP(m, idV, "V"); o != "" {
+		// 		//fPln(o)
+		// 	}
+		// 	if o := dbClt.LastOBySP(m, idS, "S"); o != "" {
+		// 		//fPln(o)
+		// 	}
+		// 	if o := dbClt.LastOBySP(m, idA, "A"); o != "" {
+		// 		//fPln(o)
+		// 	}
+		// }
+		ss, _, os, _ := dbClt.DumpAllTuples(m) // *** time (ver) desc ***
+		for i := 0; i < len(ss); i++ {
+			id, o := ss[i], os[i]
+			ver := S(sSpl(o, "-")[1]).ToInt64()
+			if _, ok := mpIDVer.Load(id); !ok {
+				mpIDVer.Store(id, ver)
+			}
+		}
+	}
+	return &mpIDVer
 }

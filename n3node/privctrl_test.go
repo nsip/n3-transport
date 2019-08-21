@@ -14,3 +14,9 @@ func TestMKPrivCtrl(t *testing.T) {
 		fPln(k, v)
 	}
 }
+
+func TestMKObjIDVerBuf(t *testing.T) {
+	defer func() { ph(recover(), "./log.txt") }()
+	dbClient := must(db.NewDBClient()).(*db.DBClient)
+	mkObjIDVerBuf(dbClient)
+}

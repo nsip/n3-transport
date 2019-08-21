@@ -3,6 +3,7 @@ package n3node
 import (
 	"fmt"
 	"strings"
+	"sync"
 
 	u "github.com/cdutwhu/go-util"
 	w "github.com/cdutwhu/go-wrappers"
@@ -43,6 +44,8 @@ var (
 	pcObjCtxPathRW = make(map[string]map[string]map[string]string)
 	forroot        = ""
 	forctx         = ""
+
+	mpObjIDVer *sync.Map
 )
 
 type (
@@ -73,4 +76,5 @@ const (
 	DELAY_CHKTERM = 5000
 	NOREAD        = "******"
 	NOWRITE       = "------"
+	BIGVER        = 999999999
 )
