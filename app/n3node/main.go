@@ -5,6 +5,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"log"
 	"os"
 	"os/exec"
@@ -66,11 +67,13 @@ func launchServices() error {
 	var serviceError error
 	cnclGnatsd, serviceError = launchGnatsd()
 	if serviceError != nil {
+		fmt.Println("launchGnatsd() error")
 		return errors.Wrap(serviceError, "cannot launch nats-server service:")
 	}
 	log.Println("...gnats service up.")
 	cnclLiftbridge, serviceError = launchLiftbridge()
 	if serviceError != nil {
+		fmt.Println("launchLiftbridge() error")
 		return errors.Wrap(serviceError, "cannot launch liftbridge service:")
 	}
 	log.Println("...liftbridge service up.")
@@ -78,11 +81,13 @@ func launchServices() error {
 	// on the network
 	cnclDispatcher, serviceError = launchDispatcher()
 	if serviceError != nil {
+		fmt.Println("launchDispatcher() error")
 		return errors.Wrap(serviceError, "cannot launch dispatcher service:")
 	}
 	log.Println("...dispatcher service up.")
 	cnclInflux, serviceError = launchInflux()
 	if serviceError != nil {
+		fmt.Println("launchInflux() error")
 		return errors.Wrap(serviceError, "cannot launch influx service:")
 	}
 	log.Println("...influx service up.")

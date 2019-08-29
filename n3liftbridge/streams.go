@@ -22,13 +22,19 @@ func CreateStream(serverAddr, subject, name string) error {
 	}
 
 	// define the stream
-	newStream := liftbridge.StreamInfo{
-		Subject:           subject,
-		Name:              name,
-		ReplicationFactor: 1,
-	}
+	// newStream := liftbridge.StreamInfo{
+	// 	Subject:           subject,
+	// 	Name:              name,
+	// 	ReplicationFactor: 1,
+	// }
 
-	if err := lbClient.CreateStream(context.Background(), newStream); err != nil {
+	// if err := lbClient.CreateStream(context.Background(), newStream); err != nil {
+	// 	if err != nil && err != liftbridge.ErrStreamExists {
+	// 		return err
+	// 	}
+	// }
+
+	if err := lbClient.CreateStream(context.Background(), subject, name); err != nil {
 		if err != nil && err != liftbridge.ErrStreamExists {
 			return err
 		}
