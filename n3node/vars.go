@@ -10,12 +10,12 @@ import (
 )
 
 var (
-	must            = u.Must
-	ph              = u.PH
-	IF              = u.IF
-	matchAssign     = u.MatchAssign
-	conditionAssign = u.ConditionAssign
-	GoFn            = u.GoFn
+	must        = u.Must
+	ph          = u.PH
+	IF          = u.IF
+	matchAssign = u.MatchAssign
+	trueAssign  = u.TrueAssign
+	GoFn        = u.GoFn
 
 	INum2Str  = w.INum2Str
 	IArrEleIn = w.IArrEleIn

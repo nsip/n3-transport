@@ -14,14 +14,14 @@ type (
 )
 
 var (
-	pe              = u.PanicOnError
-	pe1             = u.PanicOnError1
-	ph              = u.PanicHandle
-	pc              = u.PanicOnCondition
-	must            = u.Must
-	IF              = u.IF
-	matchAssign     = u.MatchAssign
-	conditionAssign = u.ConditionAssign
+	pe          = u.PanicOnError
+	pe1         = u.PanicOnError1
+	ph          = u.PanicHandle
+	pc          = u.PanicOnCondition
+	must        = u.Must
+	IF          = u.IF
+	matchAssign = u.MatchAssign
+	trueAssign  = u.TrueAssign
 
 	IArrIntersect = w.IArrIntersect
 	IArrEleIn     = w.IArrEleIn

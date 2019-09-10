@@ -10,7 +10,7 @@ import (
 	"time"
 
 	liftbridge "github.com/liftbridge-io/go-liftbridge"
-	lbproto "github.com/liftbridge-io/go-liftbridge/liftbridge-grpc"
+	lbproto "github.com/liftbridge-io/liftbridge-grpc/go"
 	nats "github.com/nats-io/go-nats"
 	"github.com/nsip/n3-messages/messages"
 	"github.com/nsip/n3-messages/messages/pb"
@@ -183,7 +183,7 @@ func (n3c *N3Node) startApprovalHandler() error {
 
 	// create the subscription and run until context is cancelled
 	go func() {
-		err := n3c.lbConn.Subscribe(ctx, "approvals", "approvals-stream", handler, liftbridge.StartAtEarliestReceived())
+		err := n3c.lbConn.Subscribe(ctx, "approvals-stream", handler, liftbridge.StartAtEarliestReceived())
 		if err != nil {
 			log.Println("node error subscribing approvals handler: ", err)
 			n3c.removeHandlerContext("approvals")
@@ -415,7 +415,7 @@ func (n3c *N3Node) startWriteHandler() error {
 			}
 		default: //         *** <VALUES> ***
 			{
-				metaType := conditionAssign(S(s).HP("::"), S(s).HP("[]"), "S", "A", "V").(string)
+				metaType := trueAssign(S(s).HP("::"), S(s).HP("[]"), "S", "A", "V").(string)
 
 				if S(ctx).HS("-meta") { // *** REQUEST A TICKET FOR PUBLISHING ***
 					if ver, ok := mpObjIDVer.Load(s); ok {
@@ -596,7 +596,7 @@ func (n3c *N3Node) startReadHandler() error {
 	// create the subscription and run until context is cancelled
 	go func() {
 		streamName := fmt.Sprintf("%s-stream", n3c.pubKey)
-		err := n3c.lbConn.Subscribe(ctx, n3c.pubKey, streamName, handler, liftbridge.StartAtOffset(nextMessage))
+		err := n3c.lbConn.Subscribe(ctx, streamName, handler, liftbridge.StartAtOffset(nextMessage))
 		if err != nil {
 			log.Println("node error subscribing read handler: ", err)
 			n3c.removeHandlerContext(n3c.pubKey)
