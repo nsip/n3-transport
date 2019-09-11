@@ -403,7 +403,7 @@ func (n3c *N3Node) startWriteHandler() error {
 			}
 		case "[]", "::": // *** <ARRAY / STRUCT> ***
 			{
-				metaType := matchAssign(p, "::", "[]", "S", "A").(string)
+				metaType := matchAssign(p, "::", "[]", "S", "A", "ERR").(string)
 				if start, end, _ := getVerRange(dbClient, ctx, p+s, metaType); start >= 1 { // *** Meta file to check alive ***
 					root := dbClient.RootByID(ctx, s, DELIPath)
 					if ss, ps, os, vs, ok := dbClient.OsBySP(ctx, p+s, root, false, true, start, end); ok {
