@@ -1,78 +1,59 @@
-# build.sh
-
-
-# creates a Mac build of the n3 components
-
-#
-# note for windows build, this go get update is
-# required on mac to pull in necessary dependencies
-#
-# GOOS=windows go get -u github.com/spf13/cobra
-#
-# OS:
-#   V1 - Just mac
-#   V2 - WIP, build for current platform
-#   V3 - Cross build all platforms
-
 set -e
 CWD=`pwd`
+OUT="build"
 
 echo "removing existing builds"
-rm -r build
+rm -rf $OUT
 
-mkdir build
-mkdir build/download
-mkdir build/services
+mkdir -p $OUT/download
+mkdir -p $OUT/services/gnatsd
+mkdir -p $OUT/services/influx
+mkdir -p $OUT/services/liftbridge
+mkdir -p $OUT/n3dispatcher
 
-echo "Downloading Influxdb"
+echo "Downloading NATS ..."
+NATS="nats-server-v2.0.4-linux-amd64"
 curl \
-	https://dl.influxdata.com/influxdb/releases/influxdb-1.7.7_darwin_amd64.tar.gz \
-	-o build/download/influxdb.tar.gz
-cd build/download
-tar xvzf influxdb.tar.gz
-cp */usr/bin/influx ../services/
-cp */usr/bin/influxd ../services/
-cp */etc/influxdb/influxdb.conf ../services/
+    -L https://github.com/nats-io/nats-server/releases/download/v2.0.4/$NATS.zip \
+    --output $OUT/download/$NATS.zip
+cd $OUT/download
+unzip $NATS.zip && cd $NATS
+cp nats-server ../../services/gnatsd
 cd $CWD
 
-echo "Creating n3 binaries"
+echo "Downloading Influx ..."
+INFLUX="influxdb-1.7.8-static_linux_amd64"
+cd $OUT/download
+wget https://dl.influxdata.com/influxdb/releases/$INFLUX.tar.gz && tar xfz $INFLUX.tar.gz
+cd ./influxdb*/
+cp influx influxd ../../services/influx
+cd $CWD
 
-GOOS=darwin
+echo "Downloading LiftBridge ..."
+LIFTBRIDGE=""
+cd $OUT/download
+LB_REPO="temptest"
+# git clone github.com/nsip/liftbridge-binary && cd -------------
+git clone https://github.com/cdutwhu/$LB_REPO && cd ./$LB_REPO
+tar -xzf liftbridge-0.0.1_linux_amd64.tar.gz && cp liftbridge ../../services/liftbridge
+cd $CWD
+
+rm -rf $OUT/download
+
+GOOS=linux
 GOARCH=amd64
 LDFLAGS="-s -w"
 
-export GO111MODULE=off
-go get github.com/liftbridge-io/go-liftbridge
-cd $GOPATH/src/github.com/liftbridge-io/go-liftbridge
-export GO111MODULE=on
-go get
-go build
-export GO111MODULE=off
+echo "Creating N3 binaries @ n3node ..."
+GOOS="$GOOS" GOARCH="$GOARCH" go build -ldflags="$LDFLAGS" -o $OUT/n3node ./app/n3node
+cd $CWD
 
-cd app/n3cli; go get; cd $CWD
-cd app/n3dispatcher; go get; cd $CWD
-cd app/n3node; go get; cd $CWD
+echo "Creating N3 binaries @ n3cli ..."
+GOOS="$GOOS" GOARCH="$GOARCH" go build -ldflags="$LDFLAGS" -o $OUT/n3cli ./app/n3cli
+cd $CWD
 
-GOOS="$GOOS" GOARCH="$GOARCH" go build -ldflags="$LDFLAGS" -o build/n3cli ./app/n3cli
-GOOS="$GOOS" GOARCH="$GOARCH" go build -ldflags="$LDFLAGS" -o build/n3dispatcher/n3dispatcher ./app/n3dispatcher
-GOOS="$GOOS" GOARCH="$GOARCH" go build -ldflags="$LDFLAGS" -o build/n3node ./app/n3node
+echo "Creating N3 binaries @ n3dispatcher ..."
+GOOS="$GOOS" GOARCH="$GOARCH" go build -ldflags="$LDFLAGS" -o $OUT/n3dispatcher/n3dispatcher ./app/n3dispatcher
+cd $CWD
 
-#echo "Creating service binaries"
-#
-#GOOS="$GOOS" GOARCH="$GOARCH" go build -ldflags="$LDFLAGS" -o build/services/gnatsd/gnatsd ../../nats-io/gnatsd
-#GOOS="$GOOS" GOARCH="$GOARCH" go build -ldflags="$LDFLAGS" -o build/services/liftbridge/liftbridge ../../liftbridge-io/liftbridge
-#
-#echo "Building influx"
-#mkdir ./build/services/influx
-#cd $GOPATH/src/github.com/influxdata/influxdb
-#go install ./...
-## include command shell for inspecting db
-#cp $GOPATH/bin/influx $GOPATH/src/github.com/nsip/n3-transport/build/services/influx
-## main db daemon
-#cp $GOPATH/bin/influxd $GOPATH/src/github.com/nsip/n3-transport/build/services/influx
-## include our modified db config file
-#cp $GOPATH/src/github.com/nsip/n3-transport/app/test/scripts/influxdb.conf $GOPATH/src/github.com/nsip/n3-transport/build/services/influx
-#
-#echo "infux built"
-
-echo "build complete"
+echo "Successful, head into $OUT and run n3node. enjoy ... :)"
