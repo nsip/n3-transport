@@ -45,14 +45,23 @@ GOARCH=amd64
 LDFLAGS="-s -w"
 
 echo "Creating N3 binaries @ n3node ..."
+cd ./app/n3node
+go get
+cd $CWD
 GOOS="$GOOS" GOARCH="$GOARCH" go build -ldflags="$LDFLAGS" -o $OUT/n3node ./app/n3node
 cd $CWD
 
 echo "Creating N3 binaries @ n3cli ..."
+cd ./app/n3cli
+go get
+cd $CWD
 GOOS="$GOOS" GOARCH="$GOARCH" go build -ldflags="$LDFLAGS" -o $OUT/n3cli ./app/n3cli
 cd $CWD
 
 echo "Creating N3 binaries @ n3dispatcher ..."
+cd ./app/n3dispatcher
+go get
+cd $CWD
 GOOS="$GOOS" GOARCH="$GOARCH" go build -ldflags="$LDFLAGS" -o $OUT/n3dispatcher/n3dispatcher ./app/n3dispatcher
 cd $CWD
 
