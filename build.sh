@@ -27,6 +27,7 @@ cd $OUT/download
 wget https://dl.influxdata.com/influxdb/releases/$INFLUX.tar.gz && tar xfz $INFLUX.tar.gz
 cd ./influxdb*/
 cp influx influxd ../../services/influx
+cd ../../services/influx && ./influxd &
 cd $CWD
 
 echo "Downloading LiftBridge ..."
