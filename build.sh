@@ -33,9 +33,9 @@ cd $CWD
 echo "Downloading LiftBridge ..."
 LIFTBRIDGE=""
 cd $OUT/download
-LB_REPO="temptest"
-# git clone github.com/nsip/liftbridge-binary && cd -------------
-git clone https://github.com/cdutwhu/$LB_REPO && cd ./$LB_REPO
+LB_REPO="liftbridge-binary"
+git clone github.com/nsip/$LB_REPO && cd ./$LB_REPO
+# git clone https://github.com/cdutwhu/$LB_REPO && cd ./$LB_REPO
 tar -xzf liftbridge-0.0.1_linux_amd64.tar.gz && cp liftbridge ../../services/liftbridge
 cd $CWD
 
