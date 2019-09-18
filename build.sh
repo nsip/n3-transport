@@ -45,6 +45,10 @@ GOOS=linux
 GOARCH=amd64
 LDFLAGS="-s -w"
 
+go get -u github.com/cdutwhu/go-util
+go get -u github.com/cdutwhu/go-wrappers
+go get -u github.com/cdutwhu/go-gjxy
+
 echo "Creating N3 binaries @ n3node ..."
 cd ./app/n3node
 go get
