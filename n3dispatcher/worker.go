@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"log"
 
-	lbproto "github.com/liftbridge-io/go-liftbridge/liftbridge-grpc"
+	lbproto "github.com/liftbridge-io/liftbridge-grpc/go"
 	"github.com/nsip/n3-messages/messages"
 	"github.com/nsip/n3-messages/messages/pb"
 	"github.com/nsip/n3-transport/n3crypto"
@@ -81,7 +81,7 @@ func startWorker(cfg *workerConfig) error {
 
 		// subscribe
 		streamName := fmt.Sprintf("%s-stream", cfg.disp.pubKey)
-		err := cfg.disp.lbConn.Subscribe(cfg.ctx, cfg.disp.pubKey, streamName, handler)
+		err := cfg.disp.lbConn.Subscribe(cfg.ctx, streamName, handler)
 		if err != nil {
 			log.Println("error subscribing worker: ", err)
 			cfg.disp.removeHandlerContext(cfg.handlerTag)

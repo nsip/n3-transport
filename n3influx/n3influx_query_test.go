@@ -162,3 +162,21 @@ func TestPairListOfSPO(t *testing.T) {
 		}
 	}
 }
+
+func TestMetaTblList(t *testing.T) {
+	defer func() { ph(recover(), "./log.txt") }()
+	dbClient := must(NewDBClient()).(*DBClient)
+	for _, m := range dbClient.MetaTblList() {
+		fPln("meta :", m)
+	}
+}
+
+func TestDumpAllTuples(t *testing.T) {
+	defer func() { ph(recover(), "./log.txt") }()
+	dbClient := must(NewDBClient()).(*DBClient)
+	dbClient.DumpAllTuples("demo1")
+	// ss, ps, os, vs := dbClient.DumpAllTuples("demo")
+	// for i := 0; i < len(ss); i++ {
+	// 	fPln(ss[i], ps[i], os[i], vs[i])
+	// }
+}

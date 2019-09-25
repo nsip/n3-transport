@@ -10,7 +10,7 @@ import (
 	"time"
 
 	liftbridge "github.com/liftbridge-io/go-liftbridge"
-	lbproto "github.com/liftbridge-io/go-liftbridge/liftbridge-grpc"
+	lbproto "github.com/liftbridge-io/liftbridge-grpc/go"
 	nats "github.com/nats-io/go-nats"
 	"github.com/nsip/n3-messages/messages"
 	"github.com/nsip/n3-messages/messages/pb"
@@ -183,7 +183,7 @@ func (n3c *N3Node) startApprovalHandler() error {
 
 	// create the subscription and run until context is cancelled
 	go func() {
-		err := n3c.lbConn.Subscribe(ctx, "approvals", "approvals-stream", handler, liftbridge.StartAtEarliestReceived())
+		err := n3c.lbConn.Subscribe(ctx, "approvals-stream", handler, liftbridge.StartAtEarliestReceived())
 		if err != nil {
 			log.Println("node error subscribing approvals handler: ", err)
 			n3c.removeHandlerContext("approvals")
@@ -209,11 +209,17 @@ func (n3c *N3Node) startWriteHandler() error {
 		return errors.Wrap(err, "node closing: no dispatcher available.")
 	}
 
-	// DONE : Fetch Privacy Control Rule
-	if dbClient.DbTblExists("databases", "tuples") &&
-		dbClient.DbTblExists("measurements", "ctxid") &&
-		dbClient.DbTblExists("measurements", "privctrl") {
-		pcObjCtxPathRW = mkPrivCtrl(dbClient)
+	// Fetch Data to be Cached
+	if dbClient.DbTblExists("databases", "tuples") {
+		// Fetch Privacy Control Rule
+		if dbClient.DbTblExists("measurements", "ctxid") && dbClient.DbTblExists("measurements", "privctrl") {
+			pcObjCtxPathRW = mkPrivCtrl(dbClient)
+		}
+		// Fetch Meta Data
+		mpObjIDVer = mkObjIDVerBuf(dbClient)
+	}
+	if mpObjIDVer == nil {
+		mpObjIDVer = &sync.Map{}
 	}
 
 	// set up handler for inbound messages [SPREAD]
@@ -327,6 +333,9 @@ func (n3c *N3Node) startWriteHandler() error {
 				return
 			}
 
+			// only for testing (A+B+C)
+			// return
+
 			err = n3c.natsConn.Publish(dispatcherid, msgBytes)
 			if err != nil {
 				log.Println("write handler unable to publish message: ", err)
@@ -394,7 +403,7 @@ func (n3c *N3Node) startWriteHandler() error {
 			}
 		case "[]", "::": // *** <ARRAY / STRUCT> ***
 			{
-				metaType := matchAssign(p, "::", "[]", "S", "A").(string)
+				metaType := matchAssign(p, "::", "[]", "S", "A", "ERR").(string)
 				if start, end, _ := getVerRange(dbClient, ctx, p+s, metaType); start >= 1 { // *** Meta file to check alive ***
 					root := dbClient.RootByID(ctx, s, DELIPath)
 					if ss, ps, os, vs, ok := dbClient.OsBySP(ctx, p+s, root, false, true, start, end); ok {
@@ -406,16 +415,21 @@ func (n3c *N3Node) startWriteHandler() error {
 			}
 		default: //         *** <VALUES> ***
 			{
-				metaType := conditionAssign(S(s).HP("::"), S(s).HP("[]"), "S", "A", "V").(string)
+				metaType := trueAssign(S(s).HP("::"), S(s).HP("[]"), "S", "A", "V").(string)
 
-				if S(ctx).HS("-meta") { //    *** REQUEST A TICKET FOR PUBLISHING ***
-					if _, end, v := getVerRange(dbClient, ctx, s, metaType); end != -1 { // *** Meta file to check alive ***
-						return mkTicket(dbClient, ctx, s, end, v) //                        *** make a ticket for publishing, -1 means it's dead ***
+				if S(ctx).HS("-meta") { // *** REQUEST A TICKET FOR PUBLISHING ***
+					if ver, ok := mpObjIDVer.Load(s); ok {
+						return mkTicket(dbClient, ctx, s, ver.(int64), BIGVER)
 					}
-					return
+					return mkTicket(dbClient, ctx, s, 0, BIGVER)
+
+					// if _, end, v := getVerRange(dbClient, ctx, s, metaType); end != -1 { // *** Meta file to check alive ***
+					// 	return mkTicket(dbClient, ctx, s, end, v) //                        *** make a ticket for publishing, -1 means it's dead ***
+					// }
+					// return
 				}
 
-				//                            *** GENERAL QUERY ***
+				//          *** GENERAL QUERY ***
 				if start, end, _ := getVerRange(dbClient, ctx, s, metaType); start >= 1 { // *** Meta file to check alive ***
 
 					fPln("*** GENERAL QUERY ***")
@@ -484,7 +498,7 @@ func (n3c *N3Node) startReadHandler() error {
 	// start up the influx publisher
 	// TODO: abstract multi-db handlers to channel reader
 	// to multiplex send to different data-stores
-	pub, err := n3influx.NewDBClient()
+	dbClt, err := n3influx.NewDBClient()
 	if err != nil {
 		return errors.Wrap(err, "read handler cannot connect to influx store:")
 	}
@@ -518,30 +532,26 @@ func (n3c *N3Node) startReadHandler() error {
 			return
 		}
 
-		// DONE: PRIVACY *** update pcObjCtxPathRW at runtime ***
+		// Added ****************************************** //
+		s, p, o, _ := tuple.Subject, tuple.Predicate, tuple.Object, tuple.Version
+
+		// PRIVACY *** update pcObjCtxPathRW at runtime ***
 		if n3msg.CtxName == "privctrl" {
-
-			_, p, o, _ := tuple.Subject, tuple.Predicate, tuple.Object, tuple.Version
-
 			forroot = IF(p != MARKTerm, sSpl(p, DELIPath)[0], forroot).(string)
 			forctx = IF(S(p).HS("forcontext"), o, forctx).(string)
-
 			if _, ok := pcObjCtxPathRW[forroot]; !ok {
 				//                                 context    path   rw
 				pcObjCtxPathRW[forroot] = make(map[string]map[string]string)
 			}
-			if _, ok := pcObjCtxPathRW[forroot][forctx]; !ok { //              *** forctx:  begin with "", then "ctx***" ***
+			if _, ok := pcObjCtxPathRW[forroot][forctx]; !ok { //        *** forctx:  begin with "", then "ctx***" ***
 				//                                         path   rw
 				pcObjCtxPathRW[forroot][forctx] = make(map[string]string)
 			}
-
 			if p == MARKTerm {
-
 				// change forctx("")'s value back to its forctx("abc")'s related value
 				for path, rw := range pcObjCtxPathRW[forroot][""] {
 					pcObjCtxPathRW[forroot][forctx][path] = IF(forctx != "", rw, "error").(string)
 				}
-
 				forctx = ""
 				pcObjCtxPathRW[forroot][forctx] = make(map[string]string)
 
@@ -550,19 +560,27 @@ func (n3c *N3Node) startReadHandler() error {
 			}
 		}
 
-		// DONE: PRIVACY *** delete pcObjCtxPathRW at runtime ***
+		// PRIVACY *** delete pcObjCtxPathRW at runtime ***
 		if n3msg.CtxName == "ctxid" {
-			if s, p, o := tuple.Subject, tuple.Predicate, tuple.Object; o == MARKDelID && pcObjCtxPathRW[s] != nil {
+			if o == MARKDelID && pcObjCtxPathRW[s] != nil {
 				delete(pcObjCtxPathRW[s], p)
 			}
 		}
 
+		// Update ObjIDVerCache
+		if S(n3msg.CtxName).HS("-meta") {
+			mpObjIDVer.Store(s, S(sSpl(o, "-")[1]).ToInt64())
+		}
+
+		// only for testing (A+B+D)
+		// return
+
 		// *** exclude "legend liftbridge data" ***
-		// if inDB(pub, n3msg.CtxName, tuple) {
+		// if inDB(dbClt, n3msg.CtxName, tuple) {
 		// 	return
 		// }
 
-		err = pub.StoreTuple(tuple, n3msg.CtxName)
+		err = dbClt.StoreTuple(tuple, n3msg.CtxName)
 		if err != nil {
 			log.Println("error storing tuple:", err)
 			return
@@ -578,7 +596,7 @@ func (n3c *N3Node) startReadHandler() error {
 	// create the subscription and run until context is cancelled
 	go func() {
 		streamName := fmt.Sprintf("%s-stream", n3c.pubKey)
-		err := n3c.lbConn.Subscribe(ctx, n3c.pubKey, streamName, handler, liftbridge.StartAtOffset(nextMessage))
+		err := n3c.lbConn.Subscribe(ctx, streamName, handler, liftbridge.StartAtOffset(nextMessage))
 		if err != nil {
 			log.Println("node error subscribing read handler: ", err)
 			n3c.removeHandlerContext(n3c.pubKey)

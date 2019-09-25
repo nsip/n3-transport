@@ -18,7 +18,7 @@ func mkTicket(dbClt *n3influx.DBClient, ctx, sub string, end, v int64) (ts []*pb
 	// 		I++
 	// 		if I >= 30000 {
 	// 			errMsg := "THIS OBJECT IS OUTSTANDING"
-	// 			ts = append(ts, &pb.SPOTuple{Subject: errMsg, Predicate: errMsg, Object: errMsg, Version: 999})
+	// 			ts = append(ts, &pb.SPOTuple{Subject: errMsg, Predicate: errMsg, Object: errMsg, Version: BIGVER})
 	// 			return
 	// 		}
 	// 		goto AGAIN
