@@ -1,6 +1,13 @@
+#!/bin/bash
+
 set -e
 CWD=`pwd`
 OUT="build"
+
+if ! [ -x "$(command -v git)" ]; then
+	echo "Missing utilitiy: unzip"
+	exit 1
+fi
 
 echo "removing existing builds"
 rm -rf $OUT
