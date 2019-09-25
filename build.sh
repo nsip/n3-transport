@@ -49,6 +49,7 @@ go get
 go build
 export GO111MODULE=off
 
+cd $CWD
 cd app/n3cli; go get; cd $CWD
 cd app/n3dispatcher; go get; cd $CWD
 cd app/n3node; go get; cd $CWD
