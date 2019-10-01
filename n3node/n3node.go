@@ -275,7 +275,7 @@ func (n3c *N3Node) startWriteHandler() error {
 				if pcPathCtrl, ok1 := pcCtxPathCtrl[ctx]; ok1 {
 					if ctrl, ok2 := pcPathCtrl[p]; ok2 {
 						switch {
-						case IArrEleIn(ctrl, Ss{"R/W", "W/R", "RW", "WR", "W"}):
+						case XIn(ctrl, []string{"R/W", "W/R", "RW", "WR", "W"}):
 						case S(ctrl).IsUUID():
 						default:
 							tupleQueue[0] = &pb.SPOTuple{Subject: s, Predicate: p, Object: NOWRITE, Version: v}
@@ -363,14 +363,14 @@ func (n3c *N3Node) startWriteHandler() error {
 		}
 
 		// *** <ObjectID / TerminatorID List> query ***
-		if IArrEleIn(s, Ss{"*", ""}) && p != "" && o != "" {
+		if XIn(s, []string{"*", ""}) && p != "" && o != "" {
 			var IDs []string
 			switch {
 			case p == MARKTerm: //                                     *** <TerminatorID> by Terminator & ObjectID ***
 				IDs = dbClient.IDListByPathValue(ctx, p, o, true, false)
 			case S(p).Contains(DELIPath): //                           *** <ObjectIDs> by path-value ***
 				IDs = dbClient.IDListByPathValue(ctx, p, o, false, true)
-			case IArrEleIn(p, Ss{"root", "ROOT", "Root"}): //          *** <ObjectIDs> by root name ***
+			case XIn(p, []string{"root", "ROOT", "Root"}): //          *** <ObjectIDs> by root name ***
 				IDs = dbClient.IDListByRoot(ctx, o, DELIPath, true)
 			}
 
@@ -438,7 +438,7 @@ func (n3c *N3Node) startWriteHandler() error {
 
 					fPln("*** CHECKING PRIVACY ***")
 					// DONE: PRIVACY, check privacy rules, modify [ts]
-					if !IArrEleIn(ctx, Ss{"ctxid", "privctrl"}) && !S(ctx).HS("meta") {
+					if !XIn(ctx, []string{"ctxid", "privctrl"}) && !S(ctx).HS("meta") {
 						for _, pt := range ts {
 							if S(pt.Subject).IsUUID() && S(pt.Predicate) != MARKTerm {
 								root := sSpl(pt.Predicate, DELIPath)[0]
@@ -448,7 +448,7 @@ func (n3c *N3Node) startWriteHandler() error {
 										switch {
 										case S(pcPathRW[pt.Predicate]).IsUUID():
 											continue
-										case !IArrEleIn(pcPathRW[pt.Predicate], Ss{"R/W", "R", "RW", "WR"}):
+										case !XIn(pcPathRW[pt.Predicate], []string{"R/W", "R", "RW", "WR"}):
 											pt.Object = NOREAD
 										}
 									}

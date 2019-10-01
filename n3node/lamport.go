@@ -115,7 +115,7 @@ func inDB(dbClient *n3influx.DBClient, ctx string, tuple *pb.SPOTuple) bool {
 	}
 
 	switch {
-	case IArrEleIn(ctx, Ss{"ctxid", "privctrl"}):
+	case XIn(ctx, []string{"ctxid", "privctrl"}):
 		return false
 	case S(ctx).HS("-meta"):
 		return false

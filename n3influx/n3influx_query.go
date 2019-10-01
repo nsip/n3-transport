@@ -9,7 +9,8 @@ import (
 
 // DbTblExists :
 func (n3ic *DBClient) DbTblExists(chkType, chkName string) bool {
-	if !IArrEleIn(chkType, Ss{"databases", "DATABASES", "measurements", "MEASUREMENTS"}) {
+	//if !IArrEleIn(chkType, Ss{"databases", "DATABASES", "measurements", "MEASUREMENTS"}) {
+	if !XIn(chkType, []string{"databases", "DATABASES", "measurements", "MEASUREMENTS"}) {
 		fPln(chkType, ": error. 1st param can only be [databases] OR [measurements]")
 		return false
 	}
@@ -70,13 +71,13 @@ func (n3ic *DBClient) TupleExists(ctx string, tuple *pb.SPOTuple, ignoreFields .
 		// PC(L != 0 && L != 1, fEf("Currently only support ignoring 1 Field(s)"))
 		ignore := ignoreFields[0]
 		switch {
-		case IArrEleIn(ignore, SINDList):
+		case XIn(ignore, SINDList):
 			qWhere = fSf(`WHERE predicate='%s' AND object='%s' AND version=%d `, p, o, v)
-		case IArrEleIn(ignore, PINDList):
+		case XIn(ignore, PINDList):
 			qWhere = fSf(`WHERE subject='%s' AND object='%s' AND version=%d `, s, o, v)
-		case IArrEleIn(ignore, OINDList):
+		case XIn(ignore, OINDList):
 			qWhere = fSf(`WHERE subject='%s' AND predicate='%s' AND version=%d `, s, p, v)
-		case IArrEleIn(ignore, VINDList):
+		case XIn(ignore, VINDList):
 			qWhere = fSf(`WHERE subject='%s' AND predicate='%s' AND object='%s' `, s, p, o)
 		}
 	}
@@ -105,15 +106,15 @@ func (n3ic *DBClient) PairOfSPOExists(ctx, spo1, spo2, spoIND1, spoIND2 string, 
 	vChkH := IF(vHigh > 0, fSf(" AND version<=%d ", vHigh), "").(string)
 	qSelect, qWhere := "", ""
 	switch {
-	case IArrEleIn(spoIND1, SINDList) && IArrEleIn(spoIND2, PINDList):
+	case XIn(spoIND1, SINDList) && XIn(spoIND2, PINDList):
 		s, p := spo1, spo2
 		qSelect = fSf(`SELECT version, object FROM "%s" `, ctx)
 		qWhere = fSf(`WHERE subject='%s' AND predicate='%s' `+vChkL+vChkH, s, p)
-	case IArrEleIn(spoIND1, SINDList) && IArrEleIn(spoIND2, OINDList):
+	case XIn(spoIND1, SINDList) && XIn(spoIND2, OINDList):
 		s, o := spo1, spo2
 		qSelect = fSf(`SELECT version, predicate FROM "%s" `, ctx)
 		qWhere = fSf(`WHERE subject='%s' AND object='%s' `+vChkL+vChkH, s, o)
-	case IArrEleIn(spoIND1, PINDList) && IArrEleIn(spoIND2, OINDList):
+	case XIn(spoIND1, PINDList) && XIn(spoIND2, OINDList):
 		p, o := spo1, spo2
 		qSelect = fSf(`SELECT version, subject FROM "%s" `, ctx)
 		qWhere = fSf(`WHERE predicate='%s' AND object='%s' `+vChkL+vChkH, p, o)
@@ -134,13 +135,13 @@ func (n3ic *DBClient) OneOfSPOExists(ctx, spo, spoIND string, vLow, vHigh int64)
 	vChkH := IF(vHigh > 0, fSf(" AND version<=%d ", vHigh), "").(string)
 	qSelect, qWhere := "", ""
 	switch {
-	case IArrEleIn(spoIND, SINDList):
+	case XIn(spoIND, SINDList):
 		qSelect = fSf(`SELECT version, predicate, object FROM "%s" `, ctx)
 		qWhere = fSf(`WHERE subject='%s' `+vChkL+vChkH, spo)
-	case IArrEleIn(spoIND, PINDList):
+	case XIn(spoIND, PINDList):
 		qSelect = fSf(`SELECT version, subject, object FROM "%s" `, ctx)
 		qWhere = fSf(`WHERE predicate='%s' `+vChkL+vChkH, spo)
-	case IArrEleIn(spoIND, OINDList):
+	case XIn(spoIND, OINDList):
 		qSelect = fSf(`SELECT version, subject, predicate FROM "%s" `, ctx)
 		qWhere = fSf(`WHERE object='%s' `+vChkL+vChkH, spo)
 	}
@@ -159,11 +160,11 @@ func (n3ic *DBClient) OneOfSPOExists(ctx, spo, spoIND string, vLow, vHigh int64)
 func (n3ic *DBClient) SingleListOfSPO(ctx, spoIND string) (rst []string) {
 	wanted := "subject"
 	switch {
-	case IArrEleIn(spoIND, SINDList):
+	case XIn(spoIND, SINDList):
 		wanted = "subject"
-	case IArrEleIn(spoIND, PINDList):
+	case XIn(spoIND, PINDList):
 		wanted = "predicate"
-	case IArrEleIn(spoIND, OINDList):
+	case XIn(spoIND, OINDList):
 		wanted = "object"
 	}
 	qStr := fSf(`SELECT distinct(%s) from (SELECT version, %s FROM "%s")`, wanted, wanted, ctx)
@@ -182,13 +183,13 @@ func (n3ic *DBClient) PairListOfSPO(ctx, spoExcl string) (rst1, rst2, rstRemain 
 	r1, r2 := []string{}, []string{}
 	spoIND1, spoIND2 := "", ""
 	switch {
-	case IArrEleIn(spoExcl, SINDList):
+	case XIn(spoExcl, SINDList):
 		r1, r2 = n3ic.SingleListOfSPO(ctx, "P"), n3ic.SingleListOfSPO(ctx, "O")
 		spoIND1, spoIND2 = "P", "O"
-	case IArrEleIn(spoExcl, PINDList):
+	case XIn(spoExcl, PINDList):
 		r1, r2 = n3ic.SingleListOfSPO(ctx, "S"), n3ic.SingleListOfSPO(ctx, "O")
 		spoIND1, spoIND2 = "S", "O"
-	case IArrEleIn(spoExcl, OINDList):
+	case XIn(spoExcl, OINDList):
 		r1, r2 = n3ic.SingleListOfSPO(ctx, "S"), n3ic.SingleListOfSPO(ctx, "P")
 		spoIND1, spoIND2 = "S", "P"
 	}
