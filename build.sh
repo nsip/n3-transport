@@ -2,7 +2,7 @@
 
 set -e
 CWD=`pwd`
-OUT="build"
+OUT="build/Linux64"
 
 if ! [ -x "$(command -v git)" ]; then
 	echo "Missing utilitiy: unzip"
@@ -48,13 +48,18 @@ cd $CWD
 
 rm -rf $OUT/download
 
-GOOS=linux
-GOARCH=amd64
-LDFLAGS="-s -w"
-
+# XXX Make sure these are all "pull" to master
 go get -u github.com/cdutwhu/go-util
 go get -u github.com/cdutwhu/go-wrappers
 go get -u github.com/cdutwhu/go-gjxy
+
+# XXX Move lifgtbride downlaod down here
+# XXX Repeat for each of the three
+# XXX Zi files
+
+GOOS=linux
+GOARCH=amd64
+LDFLAGS="-s -w"
 
 echo "Creating N3 binaries @ n3node ..."
 cd ./app/n3node
@@ -82,12 +87,12 @@ echo "ZIP Linux64"
 cd $CWD/build/Linux64
 zip -qr ../n3-client-Linux64-$VERSION.zip *
 
-echo "ZIP Win64"
-cd $CWD/build/Win64
-zip -qr ../n3-client-Win64-$VERSION.zip *
-
-echo "ZIP Mac"
-cd $CWD/build/Mac
-zip -qr ../n3-client-Mac-$VERSION.zip *
+#echo "ZIP Win64"
+#cd $CWD/build/Win64
+#zip -qr ../n3-client-Win64-$VERSION.zip *
+#
+#echo "ZIP Mac"
+##cd $CWD/build/Mac
+#zip -qr ../n3-client-Mac-$VERSION.zip *
 
 echo "Successful, head into $OUT and run n3node. enjoy ... :)"
