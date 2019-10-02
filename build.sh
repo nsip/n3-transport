@@ -87,14 +87,14 @@ cd $CWD
 
 echo "ZIP Linux64"
 cd $CWD/build/Linux64
-zip -qr ../n3-client-Linux64-$VERSION.zip *
+zip -qr ../n3-transport-Linux64-$VERSION.zip *
 
 #echo "ZIP Win64"
 #cd $CWD/build/Win64
-#zip -qr ../n3-client-Win64-$VERSION.zip *
+#zip -qr ../n3-transport-Win64-$VERSION.zip *
 #
 #echo "ZIP Mac"
 ##cd $CWD/build/Mac
-#zip -qr ../n3-client-Mac-$VERSION.zip *
+#zip -qr ../n3-transport-Mac-$VERSION.zip *
 
 echo "Successful, head into $OUT and run n3node. enjoy ... :)"
