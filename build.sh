@@ -19,9 +19,9 @@ mkdir -p $OUT/services/liftbridge
 mkdir -p $OUT/n3dispatcher
 
 echo "Downloading NATS ..."
-NATS="nats-server-v2.0.4-linux-amd64"
+NATS="nats-server-v2.1.0-linux-amd64"
 curl \
-    -L https://github.com/nats-io/nats-server/releases/download/v2.0.4/$NATS.zip \
+    -L https://github.com/nats-io/nats-server/releases/download/v2.1.0/$NATS.zip \
     --output $OUT/download/$NATS.zip
 cd $OUT/download
 unzip $NATS.zip && cd $NATS

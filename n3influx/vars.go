@@ -9,8 +9,7 @@ import (
 )
 
 type (
-	S  = w.Str
-	Ss = w.Strs
+	S  = w.Str	
 )
 
 var (
@@ -21,8 +20,8 @@ var (
 	must          = u.Must
 	IF            = u.IF
 	trueAssign    = u.TrueAssign
-	IArrIntersect = w.IArrIntersect
-	IArrEleIn     = w.IArrEleIn
+	XIn           = u.XIn
+	IArrIntersect = w.IArrIntersect	
 
 	fPf  = fmt.Printf
 	fSf  = fmt.Sprintf
@@ -30,10 +29,15 @@ var (
 	fEf  = fmt.Errorf
 	sSpl = strings.Split
 
-	SINDList = Ss{"subject", "sub", "s", "SUBJECT", "SUB", "S"}
-	PINDList = Ss{"predicate", "pred", "p", "PREDICATE", "PRED", "P"}
-	OINDList = Ss{"object", "obj", "o", "OBJECT", "OBJ", "O"}
-	VINDList = Ss{"version", "ver", "v", "VERSION", "VER", "V"}
+	// SINDList = Ss{"subject", "sub", "s", "SUBJECT", "SUB", "S"}
+	// PINDList = Ss{"predicate", "pred", "p", "PREDICATE", "PRED", "P"}
+	// OINDList = Ss{"object", "obj", "o", "OBJECT", "OBJ", "O"}
+	// VINDList = Ss{"version", "ver", "v", "VERSION", "VER", "V"}
+
+	SINDList = []string{"subject", "sub", "s", "SUBJECT", "SUB", "S"}
+	PINDList = []string{"predicate", "pred", "p", "PREDICATE", "PRED", "P"}
+	OINDList = []string{"object", "obj", "o", "OBJECT", "OBJ", "O"}
+	VINDList = []string{"version", "ver", "v", "VERSION", "VER", "V"}
 )
 
 const (

@@ -11,14 +11,15 @@ import (
 
 var (
 	must        = u.Must
-	ph          = u.PH
+	ph          = u.PanicHandle
 	IF          = u.IF
 	matchAssign = u.MatchAssign
 	trueAssign  = u.TrueAssign
 	GoFn        = u.GoFn
+	XIn         = u.XIn
 
 	INum2Str  = w.INum2Str
-	IArrEleIn = w.IArrEleIn
+	// IArrEleIn = w.IArrEleIn
 	IArrRmRep = w.IArrRmRep
 
 	fPln = fmt.Println
