@@ -1,5 +1,7 @@
 #!/bin/bash
 
+VERSION="v0.0.0"
+
 set -e
 CWD=`pwd`
 OUT="build/Linux64"
