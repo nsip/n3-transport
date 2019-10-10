@@ -127,6 +127,7 @@ rm -rf ./build/Mac/download
 go get -u github.com/cdutwhu/go-util
 go get -u github.com/cdutwhu/go-wrappers
 go get -u github.com/cdutwhu/go-gjxy
+go get github.com/inconshreveable/mousetrap
 
 # XXX Move lifgtbride downlaod down here
 # XXX Repeat for each of the three
